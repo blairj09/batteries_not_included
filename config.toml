@@ -1,5 +1,5 @@
 theme = "hugo-theme-slim"
-baseURL = "http://example.org/"
+baseURL = "https://batteriesnotincluded.netlify.com"
 languageCode = "en-us"
 title = "Batteries Not Included"
 
