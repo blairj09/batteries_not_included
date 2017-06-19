@@ -1,4 +1,20 @@
 theme = "hugo-theme-slim"
 baseURL = "http://example.org/"
 languageCode = "en-us"
-title = "My New Hugo Site"
+title = "Batteries Not Included"
+
+# Parameters
+[params]
+  subtitle = "Random observations from a universe of data"
+  summary = true
+  githubid = "blairj09"
+  twitterid = "Blair09M"
+  
+[permalinks]
+    post = "/:year/:month/:slug/"
+
+[menu]
+[[menu.main]]
+  name = "Projects"
+  url = "/projects/"
+  weight = 1

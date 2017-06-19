@@ -1,0 +1,29 @@
+---
+title: h2o Auto ML
+author: James Blair
+date: '2017-06-19'
+slug: h2o-auto-ml
+categories:
+  - r
+  - h2o
+  - machine learning
+tags: []
+---
+
+```{r setup, echo=FALSE}
+# Knitr options
+# knitr::opts_chunk$set(echo = FALSE)
+```
+
+I've seen a lot of buzz recently on Twitter revolving around the concept of AutoML. Essentailly, the automation of model generation and, in same cases, feature engineering. In my mind, the basic idea behind AutoML
+
+```{r packages, message=FALSE}
+# Load packages
+library(data.table)
+library(magrittr)
+library(h2o)
+```
+
+
+
+
