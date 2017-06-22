@@ -1,11 +1,11 @@
 theme = "hugo-theme-slim"
-baseURL = "https://batteriesnotincluded.netlify.com"
+baseURL = "/"
 languageCode = "en-us"
 title = "Batteries Not Included"
 
 # Parameters
 [params]
-  subtitle = "Random observations from a universe of data"
+  subtitle = "IID observations from a universe of data"
   summary = true
   githubid = "blairj09"
   twitterid = "Blair09M"
@@ -13,8 +13,8 @@ title = "Batteries Not Included"
 [permalinks]
     post = "/:year/:month/:slug/"
 
-[menu]
-[[menu.main]]
-  name = "Projects"
-  url = "/projects/"
-  weight = 1
+#[menu]
+#[[menu.main]]
+#  name = "Projects"
+#  url = "/projects/"
+#  weight = 1
