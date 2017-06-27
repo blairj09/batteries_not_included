@@ -5,7 +5,7 @@ date: '2017-06-19'
 slug: about
 categories: []
 tags: []
-images: "/img/family.jpg"
+images: ["/img/family.jpg"]
 ---
 
 ## Me
