@@ -1,5 +1,5 @@
 theme = "hugo-theme-slim"
-baseURL = "https://batteriesnotincluded.rbind.io/"
+baseURL = "https://batteriesnotincluded-dev.netlify.com"
 languageCode = "en-us"
 title = "Batteries Not Included"
 
