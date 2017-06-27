@@ -1,5 +1,5 @@
 theme = "hugo-theme-slim"
-baseURL = "/"
+baseURL = "https://batteriesnotincluded.rbind.io/"
 languageCode = "en-us"
 title = "Batteries Not Included"
 
@@ -13,8 +13,17 @@ title = "Batteries Not Included"
 [permalinks]
     post = "/:year/:month/:slug/"
 
-#[menu]
 #[[menu.main]]
 #  name = "Projects"
 #  url = "/projects/"
-#  weight = 1
+#  weight = 3
+  
+[[menu.main]]
+  name = "Résumé"
+  url = "/resume/"
+  weight = 2
+  
+[[menu.main]]
+  name = "About"
+  url = "/about/"
+  weight = 1
