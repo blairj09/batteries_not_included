@@ -2,9 +2,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title> {{ .Title }} &middot; {{ .Site.Title }} </title>
 
-<!-- Twitter Cards -->
-{{ partial "twitter-card" . }}
-
 <!-- CSS -->
 <link rel="stylesheet" href="{{ .Site.BaseURL }}css/slim.css">
 <link rel="stylesheet" href="{{ .Site.BaseURL }}css/highlight.min.css">
@@ -15,3 +12,8 @@
 
 <!-- RSS -->
 <link href="{{ .RSSLink }}" rel="alternate" type="application/rss+xml" title="{{ .Site.Title }}" />
+
+{{ template "_internal/opengraph.html" . }}
+{{ template "_internal/google_news.html" . }}
+{{ template "_internal/schema.html" . }}
+{{ template "_internal/twitter_cards.html" . }}
