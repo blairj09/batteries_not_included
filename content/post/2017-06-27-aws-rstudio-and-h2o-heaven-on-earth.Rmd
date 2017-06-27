@@ -1,0 +1,14 @@
+---
+title: AWS, RStudio, and h2o - Heaven on Earth
+author: James Blair
+date: '2017-06-27'
+slug: aws-rstudio-h2o
+categories: []
+tags:
+  - AWS
+  - h2o
+  - R
+draft: true
+---
+
+# Guide to quickly configuring substantial AWS instance for heavy lifting

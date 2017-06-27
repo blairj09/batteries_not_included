@@ -9,6 +9,7 @@ title = "Batteries Not Included"
   summary = true
   githubid = "blairj09"
   twitterid = "Blair09M"
+  linkedinid = "blairjm"
   
 [permalinks]
     post = "/:year/:month/:slug/"
