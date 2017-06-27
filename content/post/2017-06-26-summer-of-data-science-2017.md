@@ -8,6 +8,7 @@ tags:
   - SoDS17
   - R
   - deep learning
+images: ["https://gcn.com/~/media/GIG/GCN/Redesign/Articles/2015/May/datascience.png"]
 ---
 
 I first learned of [**#SoDS17**](https://twitter.com/search?q=%23SoDS17&src=tyah) through [Mara Averick](https://twitter.com/dataandme) and was further enlighted by [Data Science Renee's](https://twitter.com/BecomingDataSci) tweet
