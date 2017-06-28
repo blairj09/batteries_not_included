@@ -5,6 +5,7 @@ date: '2017-06-26'
 slug: resume
 categories: []
 tags: []
+images: ["/img/seo/resume_photo.jpg"]
 ---
 
 ## Professional Profile
@@ -59,9 +60,9 @@ I'm comfortable with a large variety of algorithms and frameworks and have repea
 
 ## Education
 >
-### MS, Data Science | [University of the Pacific](http://www.pacific.edu/Academics/Schools-and-Colleges/School-of-Engineering-and-Computer-Science/Academics-/Graduate-Programs/MS-in-Data-Science.html) | 2016 - 2018
+### MS, Data Science | \t[University of the Pacific](http://www.pacific.edu/Academics/Schools-and-Colleges/School-of-Engineering-and-Computer-Science/Academics-/Graduate-Programs/MS-in-Data-Science.html) | \t2016 - 2018
 >
 
 >
-### BS, Statistics | [Brigham Young University](http://statistics.byu.edu/) | 2009 - 2016
+### BS, Statistics | \t[Brigham Young University](http://statistics.byu.edu/) | \t2009 - 2016
 >

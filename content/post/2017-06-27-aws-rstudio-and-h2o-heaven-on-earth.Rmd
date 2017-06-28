@@ -11,4 +11,13 @@ tags:
 draft: true
 ---
 
-# Guide to quickly configuring substantial AWS instance for heavy lifting
+# Some title {.tabset}
+## Analysis
+This is the analysis
+
+## Making of
+This is the making of
+```{r}
+x <- rnorm(500)
+```
+
