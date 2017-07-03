@@ -10,6 +10,8 @@ title = "Batteries Not Included"
   githubid = "blairj09"
   twitterid = "Blair09M"
   linkedinid = "blairjm"
+  emailid = "james.m.blair09@gmail.com"
+  analyticsid = "UA-102003942-1"
   
 [permalinks]
     post = "/:year/:month/:slug/"
