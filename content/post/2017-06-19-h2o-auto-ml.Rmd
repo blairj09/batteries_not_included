@@ -8,7 +8,6 @@ tags:
   - machine learning
 slug: h2o-auto-ml
 draft: true
-description: "Some description"
 ---
 
 ```{r setup, echo=FALSE}
