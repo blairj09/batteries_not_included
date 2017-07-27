@@ -365,3 +365,33 @@ button,
 	color: #ccc;
 }
 
+.article-duration {
+  color: #ccc;
+  font-size: 14px;
+  margin-top: -25px;
+  display:block;
+  position: relative;
+  float: right;
+  margin-right: 30px;
+  /*
+  margin-top: 8px;
+  float: left;
+  font-size: 10px;
+  font-family: 'Lato', sans-serif;
+  padding: 1px 5px;
+  font-weight: bold;
+  border-radius: 3px;
+  background: #bbb;
+  color: #fff
+  */
+}
+
+.article-duration-index {
+  color: #ccc;
+  font-size: 14px;
+  margin-top: -25px;
+  display:block;
+  position: relative;
+  float: right;
+  right: 50%;
+}

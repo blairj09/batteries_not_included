@@ -13,11 +13,16 @@ draft: true
 
 # Some title {.tabset}
 ## Analysis
-This is the analysis
+This is the analysis^[this is a footnote]
 
 ## Making of
 This is the making of
 ```{r}
 x <- rnorm(500)
 ```
+
+# Math
+$f(x)=7$
+
+$$f(x) = g(\bar{x})$$
 
