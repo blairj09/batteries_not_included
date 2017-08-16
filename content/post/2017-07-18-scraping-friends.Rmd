@@ -1,31 +1,186 @@
 ---
 title: Scraping Friends
+description: An adventure with `rvest`
 author: James Blair
-date: '2017-07-18'
-slug: friends
+date: '2017-08-16'
+slug: scraping-friends
 categories: []
 tags:
   - R
   - SoDS17
   - tidyverse
 ---
+
 ```{r setup, include=FALSE, echo = FALSE}
 # knitr options
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      fig.width = 10,
+                      fig.height = 7)
 ```
 
-```{r packages}
+This post will outline the creation of the central dataset in the [`rfriends`](link) package. The data was scraped from [this awesome site](http://www.livesinabox.com/friends/scripts.shtml) that contains links to the **hand trascribed script** for every episode. In an effort to meet guidelines for [ethical web scraping](https://medium.com/towards-data-science/ethics-in-web-scraping-b96b18136f01) I emailed the site owner and received permission to scrape the scripts and release them as an R package. I also used [this great post](http://giorasimchoni.com/2017/06/04/2017-06-04-the-one-with-friends/) for some guidance with the initial approach. With permission and guidance in hand, it's time to dive into the data.
+
+First, we need to load the neccessary packages. We'll use `rvest` to scrape the data from the web and functions from the `tidyverse` to clean up the data. I also always load `magrittr` separate because I often use the `%<>%` function which isn't imported in `dplyr`.
+
+
+```{r visible-setup}
 # Packages
 library(tidyverse)
 library(rvest)
-library(tidytext)
 library(stringr)
 library(magrittr)
-library(roxygen2)
+library(hrbrthemes)
+library(ggalt)
+library(ggpubr)
+library(testthat)
+library(tidytext)
+library(ggjoy)
+
+# testthat settings
+# set_reporter(RstudioReporter)
+
+# Set random seed
+set.seed(35749)
+
+# Plot settings
+theme_set(theme_ipsum())
 ```
 
 ```{r utils}
-# Define helpful functions
+# Functions
+data_integrity_plots <- function(friends_script_data){
+  # Creates a plot with the number of episodes per season, the distribution of 
+  # lines per episode, and the distribution of nchar in speaker
+  #
+  # Args:
+  #  friends_script_data: tibble of friends scripts with speaker, line, and 
+  #    metadata columns
+  #
+  # Returns:
+  #  ggplot2 plot containing 3 plots - number of episodes per season, distribution
+  #  of lines per episode, and distribution of nchar in speaker
+  
+  # Number of episodes and seasons
+  episodes_per_season <- friends_script_data %>% 
+    group_by(season_num) %>% 
+    summarise(episodes = n_distinct(episode_num)) %>% 
+    ggplot(aes(x = as.factor(season_num),
+               y = episodes)) +
+    geom_lollipop() +
+    labs(title = "Episodes per Season",
+         x = "Season",
+         y = "Number of Episodes",
+         caption = "*Note that two-part episodes are transcribed as single episodes.")
+  
+  # Number of lines per episode
+  lines_per_episode <- friends_script_data %>% 
+    group_by(season_num,
+             episode_num,
+             episode_title) %>% 
+    count() %>% 
+    ggplot(aes(x = n)) +
+    geom_histogram() +
+    labs(title = "Lines per Episode",
+         x = "Number of Lines",
+         y = "Count")
+  
+  # Number of characters in speaker
+  nchar_speaker <- friends_script_data %>% 
+    mutate(nchar_speaker = nchar(speaker)) %>% 
+    ggplot(aes(x = nchar_speaker)) +
+    geom_histogram() +
+    labs(title = "Nchar Speaker",
+         x = "Number of Characters in Speaker",
+         y = "Count")
+  
+  cowplot::plot_grid(episodes_per_season,
+                     lines_per_episode,
+                     nchar_speaker,
+                     align = "h",
+                     nrow = 1)
+}
+
+data_integrity_outliers <- function(friends_script_data){
+  # Identifies outliers in speaker column based on nchar and episode based on
+  # number of lines
+  #
+  # Args: 
+  #  friends_script_data: tibble of friends scripts with speaker, line, and 
+  #    metadata columns
+  #
+  # Returns:
+  #  list of 2 tibbles containing specified outliers
+  
+  episode_outliers <- friends_script_data %>% 
+    group_by(season_num,
+             episode_num,
+             episode_title) %>% 
+    count() %>% 
+    ungroup() %>% 
+    mutate(pct_rnk = percent_rank(n)) %>% 
+    filter(pct_rnk < .01 | pct_rnk > .99) %>% 
+    arrange(pct_rnk)
+  
+  # Find outliers in nchar speaker
+  speaker_outliers <- friends_script_data %>% 
+    select(speaker) %>% 
+    unique %>% 
+    mutate(nchar_speaker = nchar(speaker),
+           pct_rnk = percent_rank(nchar_speaker)) %>% 
+    filter(pct_rnk < .01 | pct_rnk > .99) %>% 
+    arrange(pct_rnk)
+  
+  list(episode_outliers,
+       speaker_outliers)
+}
+```
+
+
+Now that we're set up and ready to go, let's take a moment to think through what we need to do in order to build out this data set.
+1. Download all scripts with identifying season and episode data
+2. Parse all scripts into speaker and line
+3. Clean up any errors
+4. Celebrate good times
+
+Let's get started.
+
+## Download Scripts
+
+Now, since we want to be respectful of the site we're pulling data from, we need to make sure that we're only scraping what we need and scraping as few times as possible. Ideally, we'd be able to pull the html for all episodes at once and then work off of our local copy to perfect the parsing of each episode without needing to re-ping the site for each new episode. With that in mind, I spent some time poking around the site to determine of there was a set structure for each episode url. The idea was if there was a clear pattern, I could write a function to manipulate the base url and pull each script at once. Unfortunately, there isn't an easily replicable pattern in the urls - most contain a reference to the season and episode number and a short slug referencing the episode title.
+
+```{r url-table, echo = TRUE}
+episode_urls <- readRDS("../../data/friends/episode_urls.Rds")
+full_urls <- glue::glue("http://www.livesinabox.com/friends/{episode_urls}")
+tibble(url = sample(full_urls, 5))
+```
+
+However, all is not lost! The main landing page [here](http://www.livesinabox.com/friends/scripts.shtml) contains links to each episode script. We can first scrape data from this page to get links to the script for every episode!
+
+```{r scrape-episode-refs}
+# Page with links to all episode scripts
+base_url <- "http://www.livesinabox.com/friends/scripts.shtml"
+base_html <- read_html(base_url)
+
+# Extract nodes related to episodes
+episode_nodes <- base_html %>% 
+  html_nodes("a")
+
+# Filter nodes to only episodes (episodes are the only href containing 3+ digits in a row)
+episode_urls <- episode_nodes %>% 
+  html_attr("href")
+
+episode_nodes <- episode_nodes[str_detect(episode_urls,
+                                          "\\d{3,}") &
+                                 !duplicated(episode_urls)]
+
+class(episode_nodes)
+length(episode_nodes)
+```
+
+We now have a `r class(episode_nodes)` of `r length(episode_nodes)` containing the complete html for the link to each episode. This means we have access to the link title which contains the episode title and we also have access to the link reference, which is the page with the html of the whole script. Now lets build out a function that will take the `xml_node` for each episode, extract the episode url and scrape the script while also providing episode meta data (season number, episode number, and episode title).
+
+```{r scrape-function}
 scrape_script <- function(xml_node){
   # Scrapes provided url and returns a tibble containing metadata and html_data
   #
@@ -61,12 +216,13 @@ scrape_script <- function(xml_node){
                                 "[0-9]{3,}") %>% 
     as.numeric
   
+  # Extract season and episode number
   season_num <- season_episode %/% 100
   episode_num <- season_episode %% 100
   
   # Clean episode title
   episode_title <- str_replace_all(episode_title,
-                                   "^E\\w+ [0-9]{3,}: | \\([0-9]\\)",
+                                   "^E\\w+ [0-9]{3,}: ?| \\([0-9]\\)",
                                    "")
   
   # Final tibble output
@@ -75,7 +231,26 @@ scrape_script <- function(xml_node){
          episode_title,
          html_data = list(html_data))
 }
+```
 
+Note that this function returns a tibble containing episode metadata along with a list column containing the html from the scraped page. This is a natural application for `purrr::map_df` in order to create a tibble of the html data for all episodes.
+
+```{r scrape-episodes}
+# Scrape episodes and put in dataframe
+friends_htmls <- map_df(episode_nodes,
+                        scrape_script)
+
+glimpse(friends_htmls)
+```
+
+We've now created a tibble (`friends_htmls`) that contains a single entry for each episode containing episode meta data and the full html for that episode. Step 1 of our outline is complete!
+
+## Parse Scripts
+Now we've come to the tricky part of this process. If the html for each episode followed the same formatting rules, this part would actually be fairly simple since we could write a single parser that would work seamlessly across all episodes. However, some poking around on the site quickly reveals that while there is a general pattern, some episodes definitely beat to the tune of their own drum. For example, take a look at [The One Where Rachel Goes Back to Work](http://www.livesinabox.com/friends/season9/911work.htm) and [The One With Ross's Inappropriate Song](http://www.livesinabox.com/friends/season9/907song.htm). This difference in structure makes it difficult to write a general parser for each episode. However, even across different html structures, there are some similarities across scripts that we can take advantage of.
+
+First, in every script, the speaker of each line is identified by the name of that speaker followed by a colon (ie Joey: This guy says hello, I wanna kill myself.). While the convention used for identifying the speaker changes (some are all caps, some are not) they all begin with a capital letter and they all have colon before the actual line. Based on this, we can use a [regular expression](https://en.wikipedia.org/wiki/Regular_expression) to extract the speaker and identify the associated line. The following parsing function is the result of quite a bit of trial and error, but it provides a good initial approach to parsing the scripts.
+
+```{r parse-function}
 parse_script <- function(html_data, title = NULL){
   # Parse html reference into dataframe with speaker and line columns
   #
@@ -95,7 +270,7 @@ parse_script <- function(html_data, title = NULL){
   script <- html_nodes(html_data, "p") %>% 
     html_text()
   
-  # Sepcial case for Season 9 episode 7
+  # Sepcial case for Season 9 Episode 7
   if(length(script) == 0){
     script <- html_nodes(html_data, "pre") %>% 
       html_text()
@@ -114,15 +289,18 @@ parse_script <- function(html_data, title = NULL){
     script %<>% str_replace_all('\\"|\\((.*?)\\)|\\[(.*?)\\]',
                                 "")
     
+    # Identify speaker pattern
+    speaker_pattern <- "([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w ]+: "
+    
     # Identify speaker name
     speaker <- script %>% 
-      str_extract_all("([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w ]+: ") %>% 
+      str_extract_all(speaker_pattern) %>% 
       unlist %>% 
       str_replace_all("[\\n:]",
                       "")
     
     # Identify the lines
-    script %<>% str_split("([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w ]+: ") %>%
+    script %<>% str_split(speaker_pattern) %>%
       unlist
     
     if(length(script) != length(speaker)){
@@ -144,14 +322,17 @@ parse_script <- function(html_data, title = NULL){
     script %<>% str_replace_all('\\"|\\(.*\\)|\\[(.*?)\\]',
                                 "")
     
+    # Identify speaker pattern
+    speaker_pattern <- "^[\\w\\. ]+:"
+    
     # Identify speaker for each line
     speaker <- str_extract(script,
-                           "^[\\w\\. ]+:") %>% 
+                           speaker_pattern) %>% 
       str_replace(":",
                   "")
     
     # Remove speaker from script
-    script %<>% str_replace("^[\\w\\. ]+:",
+    script %<>% str_replace(speaker_pattern,
                             "")
   }
   
@@ -165,79 +346,314 @@ parse_script <- function(html_data, title = NULL){
 }
 ```
 
-```{r data}
-if(file.exists("../../data/friends/friends_htmls.Rds") & FALSE){
-  # Note - currently difficult to save and read data scraped with rvest
-  # see https://github.com/hadley/rvest/issues/181
-  friends_htmls <- readRDS("../../data/friends/friends_htmls.Rds")
-} else {
-  # Scrape  ----
-  # Page with links to all episode scripts
-  base_url <- "http://www.livesinabox.com/friends/scripts.shtml"
-  base_html <- read_html(base_url)
+This parsing function returns a tibble containing a single row for each line and columns for the speaker and the line itself. The next step is to apply this function over the html for each episode, parse the script and combine the resulting tibble into a single tibble representing all episodes. I've dabbled with `purrr` in the past, but this is where it really starts to shine. I've always been a fan of the `apply` family of functions in base R, and `purrr` is a nice, tidy, drop in replacement for those functions.
+
+```{r parse-scripts}
+friends_scripts <- friends_htmls %>% 
+  mutate(script = map(html_data, parse_script)) %>% 
+  select(-html_data) %>% 
+  # This is magic
+  unnest(script)
+
+glimpse(friends_scripts)
+```
+
+Combining `purrr::map` with `dplyr::mutate` creates a list column called script that contains a tibble of the parsed script for each episode. Using `tidyr::unnest` unpacks that list column and the resulting tibble is exactly what we want: a row for each line from each episode along with the speaker and episode specific data (season and episode number along with episode title).
+
+Now that we've parsed the scripts, let's perform a couple of sanity checks to make sure that everything looks correct. First, we'll look at the number of episodes and seasons we have to make sure we really got everything. We'll also examine the distribution of lines per episode and the distribution of the number of characters in each speakers name.
+
+```{r data-integrity}
+data_integrity_plots(friends_scripts)
+```
+
+As evidenced by the plots above, it looks like we have all episodes represented. However, there appears to be a few major outliers when it comes to the number of lines per episode and the number of characters in speaker. Let's take a look at those further to identify the outliers and determine if any action needs to be taken.
+
+```{r outliers}
+data_integrity_outliers(friends_scripts)
+```
+
+Woah, *The One With The Mugging* currently contains only 24 lines. A quick visit to the [webpage](http://www.livesinabox.com/friends/season9/915mug.htm) for that episode reveals that something on our end has gone wrong. Let's investigate and determine the problem. A good place to start is by stepping through the parsing function with the episode in question.
+
+```{r parse function debug}
+# Pull out html for problem episode
+html_data <- friends_htmls %>% 
+  filter(season_num == 9,
+         episode_num == 15) %$%
+  html_data %>% 
+  .[[1]]
+
+# Step through parsing function
+# Extract script
+script <- html_nodes(html_data, "p") %>% 
+  html_text()
+
+glimpse(script)
+```
+
+Aha! It looks like we've found the bug in the first part part of the parsing script. It looks like this particular episode doesn't contain the entire script in `<p>` tags, so when we pull out the html nodes we're miss the majority of the script. A quick visit back to the [episode website](http://www.livesinabox.com/friends/season9/915mug.htm) using [selector gadget](http://selectorgadget.com) reveals this is the case. For this particular episode, the entire script is contained within a `<body>` tag. Armed with this new knowledge, the challenge now is to best determine how to deal with this special case.
+
+When it comes to handling special cases in parsing there are two distinct approaches that can be taken. So far, we've handled each case on it's own, essentially writing a new parser for each possible format/structure. On the other hand, we could write a single parser that applies to the majority of cases and then work to format special cases to meet the assumptions of that parser. This approach leads to a cleaner parsing function because it's only dealing with one expected format.
+
+As we rebuild the parsing function, it will be helpful to quickly spotcheck the performance using a subset of episodes that contain typical episode formatting and edge cases. We can either perform these spot checks manually as we make updates to the parse function, or we can write some quick testing to evaluate the performance of the parser using the `testthat` package.
+
+> A quick note on `testthat`: It looks like it has some built in functionality to run interactively within RStudio (given the fact that there is an object called `RstudioReporter` in the package). However, I have been unable to find documentation on how to use `testthat` in the optimal way from RStudio. The default implementation which uses the `StopReporter` will throw an error on any failed test. Due to this behavior, the full test suite will not run if any test fails.
+
+```{r parse tests}
+# Define test data with a few html scripts
+parse_test_data <- friends_htmls %>% 
+  filter((season_num == 9 & episode_num == 15)   |
+           (season_num == 9 & episode_num == 7)  |
+           (season_num == 1 & episode_num == 9)  |
+           (season_num == 2 & episode_num == 18) |
+           (season_num == 3 & episode_num == 3)  |
+           (season_num == 1 & episode_num == 2)  |
+           (season_num == 10 & episode_num == 4) |
+           (season_num == 3 & episode_num == 11) |
+           (season_num == 1 & episode_num == 14))
+
+parse_tests <- function(parse_fun){
+  # Tests parse_fun meets certain expectations when evaluated on test_data
   
-  # Extract nodes related to episodes
-  episode_nodes <- base_html %>% 
-    html_nodes("a")
+  parse_results <- parse_test_data %>% 
+    mutate(script = map(html_data, parse_fun)) %>% 
+    select(-html_data) %>% 
+    unnest(script)
   
-  # Filter nodes to only episodes
-  episode_urls <- episode_nodes %>% 
-    html_attr("href")
+  test_that("All episodes present in parsed data", {
+    difference <- setdiff(unique(parse_test_data$episode_title),
+                          unique(parse_results$episode_title))
+    
+    expect_true(length(difference) == 0,
+                info = glue::glue("Missed: {difference}"))
+  })
   
-  episode_nodes <- episode_nodes[str_detect(episode_urls,
-                                            "\\d{3,}") &
-                                   !duplicated(episode_urls)]
+  test_that("Number of lines per episode appears correct", {
+    line_counts <- parse_results %>% 
+      group_by(episode_title) %>% 
+      count()
+    
+    # Low line counts
+    line_counts %>% 
+      mutate(test = map(n, ~expect_true(n >= 190,
+                                        info = glue::glue("Episode: {episode_title}\t Lines: {n}"))))
+    
+    # High line counts
+    line_counts %>% 
+      mutate(test = map(n, ~expect_true(n <= 400,
+                                        info = glue::glue("Episode: {episode_title}\t Lines: {n}"))))
+  })
   
-  # Scrape episodes and put in dataframe
-  friends_htmls <- map_df(episode_nodes,
-                          scrape_script)
-  
-  # Save .RDS file
-  # saveRDS(friends_htmls,
-  #         file = "../../data/friends/friends_htmls.Rds")
+  # Test correct speaker parsing
+  test_that("Speaker has been parsed correctly", {
+    # Check that Mr. Mrs. and Dr. distinctions are correctly included
+    expect_match(parse_results$speaker,
+                 "[MD][A-Za-z]{0,2}\\.",
+                 all = FALSE)
+    
+    # Check that fireman characters are included
+    expect_match(parse_results$speaker,
+                 "Fireman",
+                 all = FALSE)
+    
+    # Check that certain edge phrases aren't considered speakers
+    expect_false(any(str_detect(parse_results$speaker,
+                                "signs")))
+    
+    expect_false(any(str_detect(parse_results$speaker,
+                                "yourself")))
+  })
 }
 ```
 
-```{r parse scripts}
-# Test wacky html formatting
-friends_htmls %>% 
-  filter(season_num == 2,
-         episode_num == 12) %$%
-  html_data %>% 
-  .[[1]] -> html_data
+```{r parse-function-update}
+parse_script <- function(html_data, title = NULL){
+  # Parse html reference into dataframe with speaker and line columns
+  #
+  # Input:
+  #  html_data: html reference to be parsed
+  #  title: used for debugging and knowing which file is currently being parsed
+  #
+  # Returns:
+  #  dataframe with speaker and line columns
+  
+  # Print title if provided
+  if(!is.null(title)){
+    print(title)
+  }
+  
+  # Extract script
+  script <- html_nodes(html_data, "body") %>% 
+    html_text()
+  
+  # Remove anything in parentheses or square brackets
+  brackets <- regex("\\((.*?)\\)|\\[(.*?)\\]|\\{(.*?)\\}",
+                    dotall = TRUE)
+  
+  script %<>% str_replace_all(brackets, "")
+  
+  # Remove unicode character \u0085
+  remove_unicode <- regex("\\u0085")
+  
+  script %<>% str_replace_all(remove_unicode,
+                              "\n")
+  
+  # Remove unicode character \\u0092
+  remove_unicode <- regex("\\u0092")
+  
+  script %<>% str_replace_all(remove_unicode,
+                              "")
+  
+  # Replace multiple spaces with single space
+  script %<>% str_replace_all(" +", " ")
+  
+  # Replace multiple new line characters with a single newline
+  script %<>% str_replace_all("[\\n\\t]+", "\n")
+  
+  # Remove quote characters
+  script %<>% str_replace_all("['\"]", "")
+  
+  speaker_pattern <- regex("([.?!]|\\n) ?([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w,'\\-&. ]+:( |\\n)?")
+  
+  # Extract speaker
+  speaker <- script %>% str_extract_all(speaker_pattern) %>% 
+    unlist
+  
+  # Split script
+  line <- script %>% str_split(speaker_pattern) %>% 
+    unlist
+  
+  # Remove leading line (not associated with speaker)
+  line <- line[-1]
+  
+  # Clean up lines and speaker
+  speaker_remove <- regex('\\"|  # remove quotes
+                          \\n|   # remove newline
+                          :|     # remove semicolon
+                          ^[.?!] # remove leading punctuation',
+                          comments = TRUE)
+  
+  speaker %<>% str_replace_all(speaker_remove,
+                                "") %>% 
+    str_trim() %>% 
+    str_to_title()
+  
+  line_remove <- regex('\\"                   | # remove quotes
+                       Crazy\\ For\\ Friends.*$ # Crazy For Friends endings',
+                       comments = TRUE,
+                       dotall = TRUE)
+  
+  line %<>% str_replace_all(line_remove,
+                            "") %>% 
+    str_replace_all("\\n",
+                    " ") %>% 
+    str_trim()
+  
+  tibble(speaker,
+         line)
+}
 
-# Parse scripts ----
+parse_tests(parse_script)
+```
+
+```{r parse-debugging, include = FALSE}
+# Pull out html for problem episode
+html_data <- friends_htmls %>% 
+  # filter(season_num == 3 & episode_num == 11) %$%
+  filter(episode_title == "The One In Barbados") %$%
+  html_data %>% 
+  .[[1]]
+```
+
+Once we have a parsing function that passes all our tests, we can run it over the full data again to generate an updated version of `friends_scripts`.
+
+```{r final-parse}
 friends_scripts <- friends_htmls %>% 
-  mutate(script = map2(html_data, episode_title, parse_script)) %>% 
+  mutate(script = map(html_data, parse_script)) %>% 
   select(-html_data) %>% 
   unnest(script)
+```
 
-# Filter entries ----
-# Remove entries that aren't lines
-to_remove <- "Aired|Copyright|NOTE|Note|Directed|written by|Teleplay|Trascribed|Written|Story"
-to_replace <- "CLOSINGCREDITS|CLOSING CREDITS|GaryHalvorson|OPENINGTITLES|OpeningTitles|OPENING TITLES|Opening Titles"
+The parsing still isn't quite perfect. For example, [The One Where Rachel's Sister Babysits](http://www.livesinabox.com/friends/1005.shtml) has an instance where speaker was parsed as *When I Moved In Here I Thought*. Given the varied formatting of each episode, it's difficult to write a parser that correctly distinguishes real speakers but doesn't identify this value as a speaker. We'll do some manual cleaning of the data next. Before we get there, let's run some of the same diagnostics we previously ran over `friends_scripts`.
 
+```{r data-integrity-two}
+data_integrity_plots(friends_scripts)
+data_integrity_outliers(friends_scripts)
+```
+
+Again, notice the parsing function isn't perfect - but we've handled the special episodes fairly well and we no longer have episodes with a drastically low number of lines. Episodes with extremely high line counts are actually two-part episodes in which case they're transcribed on the site as a single episode.
+
+## Clean Scripts
+Now that we have a nice dataset, it's tempting to call our work complete. However, there's still quite a bit of work to be done (sigh, the 80/20 rule strikes again). For example, speaker name misspellings need to be addressed and consideration needs to be given to how to handle lines with multiple speakers. We also need to check to make sure that we correctly captured all lines and don't have hidden lines nested in other lines.
+
+We'll start by removing any observations that aren't actually lines and cleaning up the speaker column. We'll identify these lines by looking at the unique speaker values from least to most common and from longest to shortest.
+
+```{r speaker-counts}
+friends_scripts %>% 
+  mutate(nchar = str_length(speaker)) %>% 
+  group_by(speaker,
+           nchar) %>% 
+  summarise(n = n(),
+            lines = list(unique(line)),
+            episodes = list(unique(episode_title))) %>% 
+  arrange(n, -nchar) %>% 
+  View()
+```
+
+
+```{r script-cleaning}
+# Remove bad lines
+to_remove <- "Aired|Copyright|NOTE|Note|Directed|written by|Teleplay|Transcrib|Written|Story|Scene|Recent Updates"
+to_replace <- "CLOSINGCREDITS|CLOSING CREDITS|Gary Halvorson|OPENINGTITLES|OpeningTitles|OPENING TITLES|Opening Titles"
+
+# Remove lines that aren't lines
 friends_scripts %<>% filter(!str_detect(speaker,
                                         to_remove))
 
+# Clean up speaker column
 friends_scripts %<>% mutate(speaker = str_replace_all(speaker,
                                                       to_replace,
                                                       ""))
 
+# String trim speaker
+friends_scripts %<>% mutate(speaker = str_trim(speaker,
+                                               side = "both"))
+```
+
+Now that we've cleaned things up a bit, let's investigate to determine if there are any nested lines that need to be broken out.
+
+```{r nested-lines}
+# Check for any nested lines
+friends_scripts %>% 
+  filter(str_detect(line,
+                    "[A-Za-z]+:")) %>% 
+  View()
+```
+
+There are a few, but for now we'll leave them. Let's also see if we can address instances where multiple people say the same line (ie Everyone, All, Both, Joey and Chandler, etc).
+
+```{r multiple-speakers}
 # Split out lines said by multiple people
 # Add line number to each episode
 friends_scripts %<>% 
   group_by(season_num, episode_num) %>% 
   mutate(line_num = row_number())
 
+multi_speaker_separator <- function(speaker){
+  # Takes speaker vector and separates out multiple speakers
+  
+  if(str_detect(speaker, " And ")){
+    speaker %<>% str_split
+  }
+}
+
 and_lines <- friends_scripts %>% 
-  filter(str_detect(tolower(speaker), 
-                    " and "))
+  filter(str_detect(speaker, 
+                    " And "))
 
 split_lines <- and_lines %>% 
   separate(speaker, 
            c("speaker_1", "speaker_2"),
-           " and | AND ") %>% 
+           " And ") %>% 
   gather(speaker_num,
          speaker,
          -c(season_num,
@@ -249,148 +665,38 @@ split_lines <- and_lines %>%
 
 # Add in split_lines to friends_scripts
 friends_scripts %<>% 
-  filter(!str_detect(tolower(speaker),
-                     " and ")) %>% 
+  filter(!str_detect(speaker,
+                     " And ")) %>% 
   rbind(split_lines) %>% 
   arrange(season_num,
           episode_num,
           line_num)
 
-
-
-# Clean up meta data ----
-# Standardize all names
-# AMGER -> Amber
-# DRHORTON -> Dr. Horton
-# DR.HORTON -> Dr. Horton
-# r Zelner -> Mr. Zelner
-# Racel -> Rachel
-# Rache -> Rachel
-# C.H.E.E.S.E -> C.H.E.E.S.E.
-
-# To fix:
-# 907 speaker: Just kind of like
-# 212 speaker Mon.MONICA
-# 907 Speaker Myexperience
-
-View(friends_scripts)
-
-# What is the distribution of nchars over speaker (ensure no weird speakers)
+# Check
 friends_scripts %>% 
-  transmute(nchar_speaker = nchar(speaker)) %>% 
-  ggplot(aes(x = nchar_speaker)) +
-  geom_histogram()
+  group_by(season_num,
+           episode_num) %>% 
+  filter(duplicated(line_num))
 
-friends_scripts %>% 
-  filter(nchar(speaker) > 15) %>% 
-  select(speaker) %>% 
-  arrange(desc(nchar(speaker)))
+# Split on commas
+comma_lines <- friends_scripts %>% 
+  filter(str_detect(speaker, 
+                    ","))
 
+comma_lines %<>%
+  mutate(speaker = str_replace(speaker,
+                               ",$",
+                               ""))
 
-
-friends_scripts %>% 
-  filter(season_num == 9,
-         episode_num == 11) %>% 
-  View
-
-
-# Save data ----
-saveRDS(friends_scripts,
-        "../../data/friends/friends_scripts.Rds")
-```
-
-```{r}
-friends_scripts %>% 
-  group_by(speaker) %>% 
-  count() %>% 
-  arrange(n)
-```
-
-
-```{r}
-friends_scripts %>% 
-  filter(str_detect(speaker, "CLOSING"))
-```
-
-
-```{r regex}
-"([MD][a-z]{1,2}\. )?[A-Z][a-z]+:"
-```
-
-
-```{r tidy text}
-# Tidy friends
-
-# Save tidy friends
-```
-
-
-```{r scraping}
-url <- "http://www.livesinabox.com/friends/season9/0922.html"
-html_data <- read_html(url)
-
-# Get episode details
-# title
-html_data %>% 
-  html_node("title") %>% 
-  html_text() %>% 
-  str_extract("(The|the) .*")
-
-# Season and episode number - parsed from url
-season_episode <- str_extract(url, "[0-9]{3,}")
-if(nchar(season_episode) == 3){
-  season <- substr(season_episode, 1, 1) %>% 
-    as.numeric
-  episode_num <- substr(season_episode, 2, 3) %>% 
-    as.numeric
-} else {
-  season <- substr(season_episode, 1, 2) %>% 
-    as.numeric
-  episode_num <- substr(season_episode, 3, 4) %>% 
-    as.numeric
+separate_comma_speakers <- function(speaker){
+  tibble(speaker = str_split(speaker, ",", simplify = TRUE) %>% 
+           str_trim())
 }
 
-season
-episode_num
-
-episode_num <- substr(season_episode)
-
-script <- html_nodes(html_data, "p") %>% html_text()
-
-# Identify dialogue lines
-script <- script[str_detect(script, "^[A-Z][a-z]+:")]
-
-# Remove new line characters
-script %<>% str_replace_all("\\n",
-                            " ")
-# Remove escaped quotes
-script %<>% str_replace_all('\\"',
-                           "")
-# Remove anything in parenthesis (not dialogue)
-script %<>% str_replace_all("\\(.*\\)",
-                           "")
-
-# Identify speaker for each line
-speaker <- str_extract(script,
-                       "^[A-Z]{1}[a-z]+:") %>% 
-  str_replace(":",
-              "")
-
-# Remove speaker from script
-script %<>% str_replace("^[A-Z]{1}[a-z]+:",
-                        "")
-
-# Create dataframe
-script_df <- data.table(speaker = speaker,
-                        line = script)
-
-# Create tidy data using tidytext
-tidy_script <- unnest_tokens(script_df,
-                             word,
-                             line)
-
-tidy_script
+comma_lines %>% 
+  mutate(speaker = map(speaker, separate_comma_speakers)) %>% 
+  unnest(speaker)
 ```
 
-
-
+## Celebrate
+Whew. Pat yourself on the back. Take a breather. We made it! We now have a (fairly) clean dataset containing the script from every episode of Friends. Now that the data is prepared in this way, the opportunities for analysis and discovery are nearly endless. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we've done here, let's save `friends_scripts` so we can load it in the future.

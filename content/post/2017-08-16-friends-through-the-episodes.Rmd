@@ -1,0 +1,149 @@
+---
+title: Friends through the Episodes
+author: James Blair
+date: '2017-08-16'
+slug: friends-through-the-episodes
+categories: []
+tags:
+  - R
+  - SoDS17
+  - tidyverse
+---
+
+# Tidy Script
+```{r tidy-script}
+tidy_scripts <- friends_scripts %>% 
+  unnest_tokens(word,
+                line)
+
+tidy_scripts %>% 
+  count(speaker) %>% 
+  arrange(desc(n))
+
+# Quick sentiment analysis of 50 word segments
+sentiment_tbl <- sentiments %>% 
+  filter(lexicon == "AFINN") %>% 
+  select(word, score)
+
+the_friends <- c("Chandler",
+                 "Rachel",
+                 "Ross",
+                 "Monica",
+                 "Joey",
+                 "Phoebe")
+
+tidy_scripts %>% 
+  filter(speaker %in% the_friends) %>% 
+  group_by(season_num,
+           episode_num) %>% 
+  mutate(word_chunk = row_number() %% 50) %>% 
+  group_by(word_chunk, 
+           add = TRUE) %>% 
+  inner_join(sentiment_tbl) %>% 
+  summarise(sentiment = mean(score)) %>% 
+  ggplot(aes(x = sentiment, y = as.factor(season_num))) +
+  geom_joy()
+
+
+# Character transformations
+tidy_scripts %>% 
+  filter(speaker %in% the_friends) %>% 
+  group_by(season_num,
+           episode_num,
+           speaker) %>% 
+  mutate(word_chunk = row_number() %% 50) %>% 
+  group_by(word_chunk, 
+           add = TRUE) %>% 
+  inner_join(sentiment_tbl) %>% 
+  summarise(sentiment = mean(score)) %>% 
+  ggplot(aes(x = sentiment, y = as.factor(season_num))) +
+  geom_joy() +
+  facet_wrap(~speaker)
+
+# What are the episodes ranked from most positive to most negative?
+tidy_scripts %>% 
+  group_by(episode_title) %>% 
+  inner_join(sentiment_tbl) %>% 
+  summarise(sentiment = mean(score)) %>% 
+  arrange(desc(sentiment))
+
+# Plot each friends top and bottom 3 episodes by sentiment
+tidy_scripts %>% 
+  filter(speaker %in% the_friends) %>% 
+  group_by(speaker,
+           episode_title) %>% 
+  inner_join(sentiment_tbl) %>% 
+  summarise(sentiment = mean(score)) %>% 
+  mutate(rank = dense_rank(sentiment)) %>% 
+  filter(rank <= 3 | rank >= (max(rank) - 2)) %>% 
+  ggplot(aes(x = forcats::fct_reorder(episode_title, sentiment), y = sentiment)) +
+  geom_col() +
+  facet_wrap(~speaker, ncol = 1) +
+  coord_flip()
+
+# Sentiment over time line graph
+tidy_scripts %>% 
+  # filter(speaker %in% the_friends) %>% 
+  group_by(season_num,
+           episode_num) %>% 
+  inner_join(sentiment_tbl) %>% 
+  summarise(sentiment = mean(score)) %>% 
+  ungroup() %>% 
+  mutate(obs_num = row_number()) %>% 
+  ggplot(aes(x = obs_num, y = sentiment, group = 1)) +
+  geom_line() +
+  theme(axis.text.x = element_blank()) +
+  labs(title = "Through the Episodes",
+       subtitle = "Friends sentiment over time",
+       x = "Episode",
+       y = "Sentiment")
+
+# Observation number for each episode
+obs_num <- friends_scripts %>% 
+  select(season_num,
+         episode_num) %>% 
+  unique() %>% 
+  mutate(obs_num = row_number())
+
+# Same plot but for each Friend
+tidy_scripts %>% 
+  filter(speaker %in% the_friends) %>%
+  group_by(season_num,
+           episode_num,
+           speaker) %>% 
+  inner_join(sentiment_tbl) %>% 
+  summarise(sentiment = mean(score)) %>% 
+  left_join(obs_num) %>% 
+  ggplot(aes(x = obs_num, y = sentiment, col = speaker)) +
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~speaker, ncol = 2) +
+  theme(axis.text.x = element_blank()) +
+  labs(title = "Through the Episodes",
+       subtitle = "Friends sentiment over time",
+       x = "Episode",
+       y = "Sentiment")
+
+# Who has the 
+
+# Words per episode for each of the friends
+total_friends_words <- tidy_scripts %>% 
+  filter(speaker %in% the_friends) %>%
+  group_by(season_num,
+           episode_num) %>% 
+  summarise(total_words = n())
+
+tidy_scripts %>% 
+  filter(speaker %in% the_friends) %>%
+  group_by(season_num,
+           episode_num) %>% 
+  count(speaker) %>% 
+  mutate(speaker_words = n) %>% 
+  left_join(total_friends_words) %>% 
+  mutate(p = speaker_words/total_words) %>% 
+  left_join(obs_num) %>% 
+  ggplot(aes(x = obs_num, y = p, col = forcats::fct_reorder2(speaker, obs_num, p))) +
+  # geom_line() +
+  # facet_wrap(~speaker, ncol = 2) +
+  geom_area(aes(fill = forcats::fct_reorder2(speaker, obs_num, p))) +
+  theme(axis.text.x = element_blank())
+```
