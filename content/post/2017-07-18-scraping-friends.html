@@ -1,0 +1,660 @@
+---
+title: Scraping Friends
+description: An adventure with rvest and the wild wild (HTML) west
+author: James Blair
+date: '2017-08-21'
+slug: scraping-friends
+categories: []
+tags:
+  - R
+  - SoDS17
+  - tidyverse
+---
+
+
+
+<p>This post will outline the process of scraping and cleaning the scripts to every <a href="https://en.wikipedia.org/wiki/Friends">Friends</a> TV episode. Subsequent posts will provide various analyses of the cleaned data. The data was scraped from <a href="http://www.livesinabox.com/friends/scripts.shtml">this awesome site</a> that contains links to the <strong>hand trascribed script</strong> for every episode. In an effort to meet suggested guidelines for <a href="https://medium.com/towards-data-science/ethics-in-web-scraping-b96b18136f01">ethical web scraping</a> I emailed the site owner and received permission to scrape the scripts and provide this post as a form of how-to. I also used <a href="http://giorasimchoni.com/2017/06/04/2017-06-04-the-one-with-friends/">this great post</a> for some guidance with the initial approach. With permission and guidance in hand, it’s time to dive into the data.</p>
+<p>First, we need to load the neccessary packages. We’ll use <code>rvest</code> to scrape the data from the web and functions from the <code>tidyverse</code> to clean up the data. I also always load <code>magrittr</code> separate because I often use the <code>%&lt;&gt;%</code> function which isn’t imported in <code>tidyverse</code>.</p>
+<pre class="r"><code># Packages
+library(tidyverse)
+library(rvest)
+library(stringr)
+library(magrittr)
+library(hrbrthemes)
+library(ggalt)
+library(ggpubr)
+library(testthat)
+
+# Set random seed
+set.seed(35749)
+
+# Plot settings
+theme_set(theme_ipsum())</code></pre>
+<p>Now that we’re set up and ready to go, let’s take a moment to think through what we need to do in order to build out this data set. 1. Download all scripts with identifying season and episode data 2. Parse all scripts into speaker and line 3. Clean up any errors 4. Celebrate good times</p>
+<p>Let’s get started.</p>
+<div id="download-scripts" class="section level2">
+<h2>Download Scripts</h2>
+<p>Now, since we want to be respectful of the site we’re pulling data from, we need to make sure that we’re only scraping what we need and scraping as few times as possible. Ideally, we’d be able to pull the html for all episodes at once and then work off of our local copy to perfect the parsing of each episode without needing to re-ping the site for each new episode. With that in mind, I spent some time poking around the site to determine of there was a set structure for each episode url. The idea was if there was a clear pattern, I could write a function to manipulate the base url and pull each script at once. Unfortunately, there isn’t an easily replicable pattern in the urls - most contain a reference to the season and episode number and a short slug referencing the episode title.</p>
+<pre class="r"><code># Page with links to all episode scripts
+base_url &lt;- &quot;http://www.livesinabox.com/friends/scripts.shtml&quot;
+base_html &lt;- read_html(base_url)
+
+# Extract nodes related to episodes
+episode_nodes &lt;- base_html %&gt;% 
+  html_nodes(&quot;a&quot;)
+
+# Filter nodes to only episodes (episodes are the only href containing 3+ digits in a row)
+episode_urls &lt;- episode_nodes %&gt;% 
+  html_attr(&quot;href&quot;)
+
+episode_nodes &lt;- episode_nodes[str_detect(episode_urls,
+                                          &quot;\\d{3,}&quot;) &amp;
+                                 !duplicated(episode_urls)]
+
+episode_urls %&lt;&gt;% str_subset(&quot;\\d{3,}&quot;)
+full_urls &lt;- glue::glue(&quot;http://www.livesinabox.com/friends/{episode_urls}&quot;)
+tibble(url = sample(full_urls, 5))</code></pre>
+<pre><code>## # A tibble: 5 x 1
+##                                                       url
+##                                                     &lt;chr&gt;
+## 1    http://www.livesinabox.com/friends/season9/0922.html
+## 2 http://www.livesinabox.com/friends/season8/815towbv.htm
+## 3           http://www.livesinabox.com/friends/1006.shtml
+## 4   http://www.livesinabox.com/friends/season6/602rhr.htm
+## 5  http://www.livesinabox.com/friends/season2/207rofo.htm</code></pre>
+<p>Notice that the url structure also varies across seasons! However, all is not lost. The main landing page <a href="http://www.livesinabox.com/friends/scripts.shtml">here</a> contains links to each episode script. We can first scrape data from this page to get links to the script for every episode! In fact, we’ve already done that and we have the link to each episode stored in <code>episode_urls</code>. We also have the meta data associated with those links in <code>episode_nodes</code>.</p>
+<p><code>episode_nodes</code> is a xml_nodeset of length 228 containing the complete html for the link to each episode. This means we have access to the link title, which contains the episode title, season number, and episode number. We also have access to the link reference, which is the page with the html of the whole script (we’ve already extracted this as <code>episode_urls</code>. Now lets build out a function that will take the <code>xml_node</code> for each episode, extract the episode url and scrape the script while also providing episode meta data (season number, episode number, and episode title).</p>
+<pre class="r"><code>scrape_script &lt;- function(xml_node){
+  # Scrapes provided url and returns a tibble containing metadata and html_data
+  #
+  # Args:
+  #  xml_node: xml_nodeset from rvest
+  #
+  # Returns:
+  #  data.frame with the following columns:
+  #    - season_num
+  #    - episode_num
+  #    - episode_title
+  #    - html_data
+  
+  # Set url for scraping
+  relative_url &lt;- html_attr(xml_node, &quot;href&quot;)
+  url &lt;- glue::glue(&quot;http://www.livesinabox.com/friends/{relative_url}&quot;)
+  
+  # Debugging
+  print(url)
+  
+  # Read html
+  html_data &lt;- read_html(url)
+  
+  # Season and episode number
+  episode_title &lt;- xml_node %&gt;% 
+    html_text %&gt;% 
+    str_replace_all(&#39;[\\n\\&quot;\\&quot;\\t]&#39;,
+                    &quot;&quot;) %&gt;% 
+    str_replace_all(&quot;[ ]+&quot;,
+                    &quot; &quot;)
+  
+  season_episode &lt;- str_extract(episode_title, 
+                                &quot;[0-9]{3,}&quot;) %&gt;% 
+    as.numeric
+  
+  # Extract season and episode number
+  season_num &lt;- season_episode %/% 100
+  episode_num &lt;- season_episode %% 100
+  
+  # Clean episode title
+  episode_title &lt;- str_replace_all(episode_title,
+                                   &quot;^E\\w+ [0-9]{3,}: ?| \\([0-9]\\)&quot;,
+                                   &quot;&quot;)
+  
+  # Final tibble output
+  tibble(season_num,
+         episode_num,
+         episode_title,
+         html_data = list(html_data))
+}</code></pre>
+<p>Note that this function returns a tibble containing episode metadata along with a list column containing the html from the scraped page. This is a natural application for <code>purrr::map_df</code> in order to create a tibble of the html data for all episodes.</p>
+<pre class="r"><code># Scrape episodes and put in dataframe
+friends_htmls &lt;- map_df(episode_nodes,
+                        scrape_script)</code></pre>
+<pre class="r"><code>glimpse(friends_htmls)</code></pre>
+<pre><code>## Observations: 228
+## Variables: 4
+## $ season_num    &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+## $ episode_num   &lt;dbl&gt; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 1...
+## $ episode_title &lt;chr&gt; &quot;The Pilot-The Uncut Version&quot;, &quot;The One With The...
+## $ html_data     &lt;list&gt; [&lt;html&gt;, &lt;html&gt;, &lt;html&gt;, &lt;html&gt;, &lt;html&gt;, &lt;html&gt;...</code></pre>
+<p>We’ve now created a tibble (<code>friends_htmls</code>) that contains a single entry for each episode. Each row containis episode meta data and the full html for that episode. Step 1 of our outline is complete!</p>
+</div>
+<div id="parse-scripts" class="section level2">
+<h2>Parse Scripts</h2>
+<p>Now we’ve come to the tricky part of this process. If the html for each episode followed the same formatting standard, this part would actually be fairly simple since we could write a single parser that would work seamlessly across all episodes. However, some poking around on the site quickly reveals that while there is a general pattern, some episodes definitely beat to the tune of their own drum. For example, take a look at <a href="http://www.livesinabox.com/friends/season9/911work.htm">The One Where Rachel Goes Back to Work</a> and <a href="http://www.livesinabox.com/friends/season9/907song.htm">The One With Ross’s Inappropriate Song</a>. This difference in structure makes it difficult to write a general parser for each episode. However, even across different html structures, there are some similarities across scripts that we can take advantage of.</p>
+<p>First, in every script, the speaker of each line is identified by the name of that speaker followed by a colon (ie <em>Joey: This guy says hello, I wanna kill myself.</em>). While the convention used for identifying the speaker changes (some are all caps, some are not) they all begin with a capital letter and they all have colon before the actual line. Based on this, we can use a <a href="https://en.wikipedia.org/wiki/Regular_expression">regular expression</a> to extract the speaker and identify the associated line. Regular expressions can be a bit tricky, but Hadley Wickham and Garret Grolemund provide a great intro in the <a href="http://r4ds.had.co.nz/strings.html">strings chapter</a> of <a href="http://r4ds.had.co.nz/">R for Data Science</a>. The following parsing function is the result of quite a bit of trial and error, but it provides a good initial approach to parsing the scripts.</p>
+<pre class="r"><code>parse_script &lt;- function(html_data, title = NULL){
+  # Parse html reference into dataframe with speaker and line columns
+  #
+  # Input:
+  #  html_data: html reference to be parsed
+  #  title: used for debugging and knowing which file is currently being parsed
+  #
+  # Returns:
+  #  dataframe with speaker and line columns
+  
+  # Print title if provided - used for debugging purposes
+  if (!is.null(title)) {
+    print(title)
+  }
+  
+  # Extract script
+  script &lt;- html_nodes(html_data, &quot;p&quot;) %&gt;% 
+    html_text()
+  
+  # Sepcial case for Season 9 Episode 7
+  if (length(script) == 0) {
+    script &lt;- html_nodes(html_data, &quot;pre&quot;) %&gt;% 
+      html_text()
+  }
+  
+  # Handle times when script isn&#39;t broken out by lines
+  if (length(script) &lt; 20) {
+    # Collapse script into single character vector
+    script &lt;- str_c(script, collapse = &quot; &quot;)
+    
+    # Remove new line characters
+    script %&lt;&gt;% str_replace_all(&quot;[::punct::]?\\n&quot;,
+                                &quot;. &quot;)
+    
+    # Remove non dialogue
+    script %&lt;&gt;% str_replace_all(&#39;\\&quot;|\\((.*?)\\)|\\[(.*?)\\]&#39;,
+                                &quot;&quot;)
+    
+    # Identify speaker pattern
+    speaker_pattern &lt;- &quot;([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w ]+: &quot;
+    
+    # Identify speaker name
+    speaker &lt;- script %&gt;% 
+      str_extract_all(speaker_pattern) %&gt;% 
+      unlist %&gt;% 
+      str_replace_all(&quot;[\\n:]&quot;,
+                      &quot;&quot;)
+    
+    # Identify the lines
+    script %&lt;&gt;% str_split(speaker_pattern) %&gt;%
+      unlist
+    
+    if (length(script) != length(speaker)) {
+      script &lt;- script[-1]
+    }
+    
+  } else {
+    # Identify dialogue lines
+    script &lt;- script[str_detect(script, &quot;^[\\w\\. ]+:&quot;)]
+    
+    # Remove new line characters
+    script %&lt;&gt;% str_replace_all(&quot;\\n&quot;,
+                                &quot; &quot;)
+    # Remove:
+    #  escaped quotes
+    #  text in parantheses (not dialogue)
+    #  text in square brackets
+    script %&lt;&gt;% str_replace_all(&#39;\\&quot;|\\(.*\\)|\\[(.*?)\\]&#39;,
+                                &quot;&quot;)
+    
+    # Identify speaker pattern
+    speaker_pattern &lt;- &quot;^[\\w\\. ]+:&quot;
+    
+    # Identify speaker for each line
+    speaker &lt;- str_extract(script,
+                           speaker_pattern) %&gt;% 
+      str_replace(&quot;:&quot;,
+                  &quot;&quot;)
+    
+    # Remove speaker from script
+    script %&lt;&gt;% str_replace(speaker_pattern,
+                            &quot;&quot;)
+  }
+  
+  # Clean up any unnecessary white space
+  speaker %&lt;&gt;% str_trim()
+  script %&lt;&gt;% str_trim()
+  
+  # Create dataframe
+  tibble(speaker,
+         line = script)
+}</code></pre>
+<p>This parsing function returns a tibble containing a single row for each line and columns for the speaker and the line itself. The next step is to apply this function over the html for each episode, parse the script and combine the resulting tibble into a single tibble representing all episodes. I’ve dabbled with <code>purrr</code> in the past, but this is where it really starts to shine. I’ve always been a fan of the <code>apply</code> family of functions in base R, and <code>purrr</code> is a nice, tidy, drop in replacement for those functions. Behold, the magic:</p>
+<pre class="r"><code>friends_scripts &lt;- friends_htmls %&gt;% 
+  mutate(script = map(html_data, parse_script)) %&gt;% 
+  select(-html_data) %&gt;% 
+  # This is magic
+  unnest(script)
+
+glimpse(friends_scripts)</code></pre>
+<pre><code>## Observations: 61,615
+## Variables: 5
+## $ season_num    &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+## $ episode_num   &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+## $ episode_title &lt;chr&gt; &quot;The Pilot-The Uncut Version&quot;, &quot;The Pilot-The Un...
+## $ speaker       &lt;chr&gt; &quot;Written by&quot;, &quot;Monica&quot;, &quot;Joey&quot;, &quot;Chandler&quot;, &quot;Pho...
+## $ line          &lt;chr&gt; &quot;Marta Kauffman &amp; David Crane&quot;, &quot;There&#39;s nothing...</code></pre>
+<p>Combining <code>purrr::map</code> with <code>dplyr::mutate</code> creates a list column called script that contains a tibble of the parsed script for each episode. Using <code>tidyr::unnest</code> unpacks that list column and the resulting tibble is exactly what we want: a row for each line from each episode along with the speaker and episode specific data (season number, episode number, and episode title).</p>
+<p>Now that we’ve parsed the scripts, let’s perform a couple of sanity checks to make sure that everything looks correct. First, we’ll look at the number of episodes and seasons we have to make sure we really got everything. We’ll also examine the distribution of lines per episode and the distribution of the number of characters in each speakers name.</p>
+<pre class="r"><code># Define some functions that will be used a few times
+data_integrity_plots &lt;- function(friends_script_data){
+  # Creates a plot with the number of episodes per season, the distribution of 
+  # lines per episode, and the distribution of nchar in speaker
+  #
+  # Args:
+  #  friends_script_data: tibble of friends scripts with speaker, line, and 
+  #    metadata columns
+  #
+  # Returns:
+  #  ggplot2 plot containing 3 plots - number of episodes per season, distribution
+  #  of lines per episode, and distribution of nchar in speaker
+  
+  # Number of episodes and seasons
+  episodes_per_season &lt;- friends_script_data %&gt;% 
+    group_by(season_num) %&gt;% 
+    summarise(episodes = n_distinct(episode_num)) %&gt;% 
+    ggplot(aes(x = as.factor(season_num),
+               y = episodes)) +
+    geom_lollipop() +
+    labs(title = &quot;Episodes per Season&quot;,
+         x = &quot;Season&quot;,
+         y = &quot;Number of Episodes&quot;,
+         caption = &quot;*Note that two-part episodes are transcribed as single episodes.&quot;)
+  
+  # Number of lines per episode
+  lines_per_episode &lt;- friends_script_data %&gt;% 
+    group_by(season_num,
+             episode_num,
+             episode_title) %&gt;% 
+    count() %&gt;% 
+    ggplot(aes(x = n)) +
+    geom_histogram() +
+    labs(title = &quot;Lines per Episode&quot;,
+         x = &quot;Number of Lines&quot;,
+         y = &quot;Count&quot;)
+  
+  # Number of characters in speaker
+  nchar_speaker &lt;- friends_script_data %&gt;% 
+    mutate(nchar_speaker = nchar(speaker)) %&gt;% 
+    ggplot(aes(x = nchar_speaker)) +
+    geom_histogram() +
+    labs(title = &quot;Nchar Speaker&quot;,
+         x = &quot;Number of Characters in Speaker&quot;,
+         y = &quot;Count&quot;)
+  
+  cowplot::plot_grid(episodes_per_season,
+                     lines_per_episode,
+                     nchar_speaker,
+                     align = &quot;h&quot;,
+                     nrow = 1)
+}
+
+data_integrity_outliers &lt;- function(friends_script_data){
+  # Identifies outliers in speaker column based on nchar and episode based on
+  # number of lines
+  #
+  # Args: 
+  #  friends_script_data: tibble of friends scripts with speaker, line, and 
+  #    metadata columns
+  #
+  # Returns:
+  #  list of 2 tibbles containing specified outliers
+  
+  episode_outliers &lt;- friends_script_data %&gt;% 
+    group_by(season_num,
+             episode_num,
+             episode_title) %&gt;% 
+    count() %&gt;% 
+    ungroup() %&gt;% 
+    mutate(pct_rnk = percent_rank(n)) %&gt;% 
+    filter(pct_rnk &lt; .01 | pct_rnk &gt; .99) %&gt;% 
+    arrange(pct_rnk)
+  
+  # Find outliers in nchar speaker
+  speaker_outliers &lt;- friends_script_data %&gt;% 
+    select(speaker) %&gt;% 
+    unique %&gt;% 
+    mutate(nchar_speaker = nchar(speaker),
+           pct_rnk = percent_rank(nchar_speaker)) %&gt;% 
+    filter(pct_rnk &lt; .01 | pct_rnk &gt; .99) %&gt;% 
+    arrange(pct_rnk)
+  
+  list(episode_outliers,
+       speaker_outliers)
+}</code></pre>
+<pre class="r"><code>data_integrity_plots(friends_scripts)</code></pre>
+<p><img src="/post/2017-07-18-scraping-friends_files/figure-html/data-integrity-plot-1.png" width="768" /></p>
+<p>As evidenced by the plots above, it looks like we have all episodes represented. However, there appears to be a few major outliers when it comes to the number of lines per episode and the number of characters in speaker. Let’s take a look at those further to identify the outliers and determine if any action needs to be taken.</p>
+<pre class="r"><code>data_integrity_outliers(friends_scripts)</code></pre>
+<pre><code>## [[1]]
+## # A tibble: 6 x 5
+##   season_num episode_num                                   episode_title
+##        &lt;dbl&gt;       &lt;dbl&gt;                                           &lt;chr&gt;
+## 1          9          15                        The One With The Mugging
+## 2          1          14                   The One With The Candy Hearts
+## 3          7          12              The One Where They&#39;re Up All Night
+## 4         10          17                                    The Last One
+## 5          9          23                             The One In Barbados
+## 6          4          23 The One With Ross&#39;s Wedding - The Uncut Version
+## # ... with 2 more variables: n &lt;int&gt;, pct_rnk &lt;dbl&gt;
+## 
+## [[2]]
+## # A tibble: 44 x 3
+##    speaker nchar_speaker     pct_rnk
+##      &lt;chr&gt;         &lt;int&gt;       &lt;dbl&gt;
+##  1      PA             2 0.000000000
+##  2      TV             2 0.000000000
+##  3     All             3 0.002503129
+##  4     Kid             3 0.002503129
+##  5     Bob             3 0.002503129
+##  6     Guy             3 0.002503129
+##  7     Max             3 0.002503129
+##  8     Man             3 0.002503129
+##  9     ALL             3 0.002503129
+## 10     ROB             3 0.002503129
+## # ... with 34 more rows</code></pre>
+<p>Woah, <em>The One With The Mugging</em> currently contains only 24 lines. A quick visit to the <a href="http://www.livesinabox.com/friends/season9/915mug.htm">webpage</a> for that episode reveals that something on our end has gone terribly wrong. Let’s investigate and determine the problem. A good place to start is by stepping through the parsing function with the episode in question.</p>
+<pre class="r"><code># Pull out html for problem episode
+html_data &lt;- friends_htmls %&gt;% 
+  filter(season_num == 9,
+         episode_num == 15) %$%
+  html_data %&gt;% 
+  .[[1]]
+
+# Step through parsing function
+# Extract script
+script &lt;- html_nodes(html_data, &quot;p&quot;) %&gt;% 
+  html_text()
+
+glimpse(script)</code></pre>
+<pre><code>##  chr [1:2] &quot; Chandler: (excited) Guys, guys, I&#39;ve got great news! Guess what\u0085Joey: Uh, ah, Monica&#39;s pregnant?!Monica: &quot;| __truncated__ ...</code></pre>
+<p>Aha! It looks like we’ve found the bug in the first part part of the parsing script. It looks like this particular episode doesn’t contain the entire script in <code>&lt;p&gt;</code> tags, so when we pull out the html nodes we’re missing the majority of the script. A quick visit back to the <a href="http://www.livesinabox.com/friends/season9/915mug.htm">episode website</a> using <a href="http://selectorgadget.com">selector gadget</a> reveals this is the case. For this particular episode, the entire script is contained within a <code>&lt;body&gt;</code> tag. Armed with this new knowledge, the challenge now is to best determine how to deal with this special case.</p>
+<p>When it comes to handling special cases in parsing there are two distinct approaches that can be taken. So far, we’ve handled each case on it’s own, essentially writing a new parser for each possible format/structure. On the other hand, we could write a single parser that applies to the majority of cases and then work to format special cases to meet the assumptions of that parser. This approach leads to a cleaner parsing function because it’s only dealing with one expected format.</p>
+<p>As we rebuild the parsing function, it will be helpful to quickly spotcheck the performance using a subset of episodes that contain typical episode formatting and edge cases. We can either perform these spot checks manually as we make updates to the parsing function, or we can write some quick test steps to evaluate the performance of the parser using the <code>testthat</code> package.</p>
+<blockquote>
+<p>A quick note on <code>testthat</code>: It looks like it has some built in functionality to run interactively within RStudio (given the fact that there is an object called <code>RstudioReporter</code> in the package). However, I have been unable to find documentation on how to use <code>testthat</code> in the optimal way from RStudio. The default implementation, which uses the <code>StopReporter</code>, will throw an error on any failed test. Due to this behavior, the full test suite will not run if any test prior to the final test fails.</p>
+</blockquote>
+<pre class="r"><code># Define test data with a few html scripts
+parse_test_data &lt;- friends_htmls %&gt;% 
+  filter((season_num == 9 &amp; episode_num == 15)   |
+           (season_num == 9 &amp; episode_num == 7)  |
+           (season_num == 1 &amp; episode_num == 9)  |
+           (season_num == 2 &amp; episode_num == 18) |
+           (season_num == 3 &amp; episode_num == 3)  |
+           (season_num == 1 &amp; episode_num == 2)  |
+           (season_num == 10 &amp; episode_num == 4) |
+           (season_num == 3 &amp; episode_num == 11) |
+           (season_num == 1 &amp; episode_num == 14))
+
+parse_tests &lt;- function(parse_fun){
+  # Tests parse_fun meets certain expectations when evaluated on test_data
+  
+  parse_results &lt;- parse_test_data %&gt;% 
+    mutate(script = map(html_data, parse_fun)) %&gt;% 
+    select(-html_data) %&gt;% 
+    unnest(script)
+  
+  test_that(&quot;All episodes present in parsed data&quot;, {
+    difference &lt;- setdiff(unique(parse_test_data$episode_title),
+                          unique(parse_results$episode_title))
+    
+    expect_true(length(difference) == 0,
+                info = glue::glue(&quot;Missed: {difference}&quot;))
+  })
+  
+  test_that(&quot;Number of lines per episode appears correct&quot;, {
+    line_counts &lt;- parse_results %&gt;% 
+      group_by(episode_title) %&gt;% 
+      count()
+    
+    # Low line counts
+    line_counts %&gt;% 
+      mutate(test = map(n, ~expect_true(n &gt;= 190,
+                                        info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
+    
+    # High line counts
+    line_counts %&gt;% 
+      mutate(test = map(n, ~expect_true(n &lt;= 400,
+                                        info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
+  })
+  
+  # Test correct speaker parsing
+  test_that(&quot;Speaker has been parsed correctly&quot;, {
+    # Check that Mr. Mrs. and Dr. distinctions are correctly included
+    expect_match(parse_results$speaker,
+                 &quot;[MD][A-Za-z]{0,2}\\.&quot;,
+                 all = FALSE)
+    
+    # Check that fireman characters are included
+    expect_match(parse_results$speaker,
+                 &quot;Fireman&quot;,
+                 all = FALSE)
+    
+    # Check that multi-speaker lines are included
+    expect_match(parse_results$speaker,
+                 &quot; And &quot;,
+                 all = FALSE)
+    
+    # Check that certain edge phrases aren&#39;t considered speakers
+    expect_false(any(str_detect(parse_results$speaker,
+                                &quot;Signs&quot;)))
+    
+    expect_false(any(str_detect(parse_results$speaker,
+                                &quot;Yourself&quot;)))
+    
+    # expect_false(any(str_detect(parse_results$speaker,
+    #                             &quot;Seven Sisters&quot;)))
+  })
+}</code></pre>
+<pre class="r"><code>parse_script &lt;- function(html_data, title = NULL){
+  # Parse html reference into dataframe with speaker and line columns
+  #
+  # Input:
+  #  html_data: html reference to be parsed
+  #  title: used for debugging and knowing which file is currently being parsed
+  #
+  # Returns:
+  #  dataframe with speaker and line columns
+  
+  # Print title if provided
+  if (!is.null(title)) print(title)
+  
+  # Extract script
+  script &lt;- html_nodes(html_data, &quot;body&quot;) %&gt;% 
+    html_text()
+  
+  # Remove anything in parentheses or square brackets
+  brackets &lt;- regex(&quot;\\((.*?)\\)|\\[(.*?)\\]|\\{(.*?)\\}&quot;,
+                    dotall = TRUE)
+  
+  script %&lt;&gt;% str_replace_all(brackets, &quot;&quot;)
+  
+  # Remove unicode character \u0085
+  remove_unicode &lt;- regex(&quot;\\u0085&quot;)
+  
+  script %&lt;&gt;% str_replace_all(remove_unicode,
+                              &quot;\n&quot;)
+  
+  # Remove unicode character \\u0092
+  remove_unicode &lt;- regex(&quot;\\u0092&quot;)
+  
+  script %&lt;&gt;% str_replace_all(remove_unicode,
+                              &quot;&quot;)
+  
+  # Replace multiple spaces with single space
+  script %&lt;&gt;% str_replace_all(&quot; +&quot;, &quot; &quot;)
+  
+  # Replace multiple new line characters with a single newline
+  script %&lt;&gt;% str_replace_all(&quot;[\\n\\t]+&quot;, &quot;\n&quot;)
+  
+  # Remove quote characters
+  script %&lt;&gt;% str_replace_all(&quot;[&#39;\&quot;]&quot;, &quot;&quot;)
+  
+  speaker_pattern &lt;- regex(&quot;([.?!]|\\n) ?([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w,&#39;\\-&amp;. ]+:( |\\n)?&quot;)
+  
+  # Extract speaker
+  speaker &lt;- script %&gt;% str_extract_all(speaker_pattern) %&gt;% 
+    unlist
+  
+  # Split script
+  line &lt;- script %&gt;% str_split(speaker_pattern) %&gt;% 
+    unlist
+  
+  # Remove leading line (not associated with speaker)
+  line &lt;- line[-1]
+  
+  # Clean up lines and speaker
+  speaker_remove &lt;- regex(&#39;\\&quot;|  # remove quotes
+                          \\n|   # remove newline
+                          :|     # remove semicolon
+                          ^[.?!] # remove leading punctuation&#39;,
+                          comments = TRUE)
+  
+  speaker %&lt;&gt;% str_replace_all(speaker_remove,
+                                &quot;&quot;) %&gt;% 
+    str_trim() %&gt;% 
+    str_to_title()
+  
+  line_remove &lt;- regex(&#39;\\&quot;                   | # remove quotes
+                       Crazy\\ For\\ Friends.*$ # Crazy For Friends endings&#39;,
+                       comments = TRUE,
+                       dotall = TRUE)
+  
+  line %&lt;&gt;% str_replace_all(line_remove,
+                            &quot;&quot;) %&gt;% 
+    str_replace_all(&quot;\\n&quot;,
+                    &quot; &quot;) %&gt;% 
+    str_trim()
+  
+  tibble(speaker,
+         line)
+}
+
+parse_tests(parse_script)</code></pre>
+<p>Once we have a parsing function that passes all our tests, we can run it over the full data again to generate an updated version of <code>friends_scripts</code>.</p>
+<pre class="r"><code>friends_scripts &lt;- friends_htmls %&gt;% 
+  mutate(script = map(html_data, parse_script)) %&gt;% 
+  select(-html_data) %&gt;% 
+  unnest(script)</code></pre>
+<p>The parsing still isn’t quite perfect. For example, <a href="http://www.livesinabox.com/friends/1005.shtml">The One Where Rachel’s Sister Babysits</a> has an instance where speaker was parsed as <em>When I Moved In Here I Thought</em>. Given the varied formatting of each episode, it’s difficult to write a parser that correctly distinguishes real speakers but doesn’t identify this value as a speaker. We’ll do some manual cleaning of the data next. Before we get there, let’s run the same diagnostics we previously ran over <code>friends_scripts</code>.</p>
+<pre class="r"><code>data_integrity_plots(friends_scripts)</code></pre>
+<p><img src="/post/2017-07-18-scraping-friends_files/figure-html/data-integrity-two-1.png" width="768" /></p>
+<pre class="r"><code>data_integrity_outliers(friends_scripts)</code></pre>
+<pre><code>## [[1]]
+## # A tibble: 6 x 5
+##   season_num episode_num                                   episode_title
+##        &lt;dbl&gt;       &lt;dbl&gt;                                           &lt;chr&gt;
+## 1          1          14                   The One With The Candy Hearts
+## 2          1           8                   The One Where Nana Dies Twice
+## 3          7          12              The One Where They&#39;re Up All Night
+## 4         10          17                                    The Last One
+## 5          9          23                             The One In Barbados
+## 6          4          23 The One With Ross&#39;s Wedding - The Uncut Version
+## # ... with 2 more variables: n &lt;int&gt;, pct_rnk &lt;dbl&gt;
+## 
+## [[2]]
+## # A tibble: 41 x 3
+##    speaker nchar_speaker     pct_rnk
+##      &lt;chr&gt;         &lt;int&gt;       &lt;dbl&gt;
+##  1      Pa             2 0.000000000
+##  2      Tv             2 0.000000000
+##  3     All             3 0.001939864
+##  4     Kid             3 0.001939864
+##  5     Bob             3 0.001939864
+##  6     Guy             3 0.001939864
+##  7     Max             3 0.001939864
+##  8     Man             3 0.001939864
+##  9     Rob             3 0.001939864
+## 10     Roy             3 0.001939864
+## # ... with 31 more rows</code></pre>
+<p>Again, notice the parsing function isn’t perfect - but we’ve handled the special episodes fairly well and we no longer have any episodes with a drastically low number of lines. Episodes with extremely high line counts are actually two-part episodes which were transcribed on the site as a single episode.</p>
+</div>
+<div id="clean-scripts" class="section level2">
+<h2>Clean Scripts</h2>
+<p>Now that we have a nice dataset, it’s tempting to call our work complete. However, there’s still quite a bit of work to be done. For example, speaker name misspellings need to be addressed and consideration needs to be given to how to handle lines with multiple speakers. We also need to check to make sure that we correctly captured all lines and don’t have hidden lines nested in other lines.</p>
+<p>We’ll start by removing any observations that aren’t actually lines and cleaning up the speaker column. We’ll identify these lines by looking at the unique speaker values from least to most common and from longest to shortest.</p>
+<pre class="r"><code>friends_scripts %&gt;% 
+  mutate(nchar = str_length(speaker)) %&gt;% 
+  group_by(speaker,
+           nchar) %&gt;% 
+  summarise(n = n(),
+            lines = list(unique(line)),
+            episodes = list(unique(episode_title))) %&gt;% 
+  arrange(n, -nchar) %&gt;% 
+  View()</code></pre>
+<pre class="r"><code># Remove bad lines
+to_remove &lt;- &quot;Aired|Copyright|NOTE|Note|Directed|written by|Teleplay|Transcrib|Written|Story|Scene|Recent Updates&quot;
+to_replace &lt;- &quot;CLOSINGCREDITS|CLOSING CREDITS|Gary Halvorson|OPENINGTITLES|OpeningTitles|OPENING TITLES|Opening Titles&quot;
+
+# Remove lines that aren&#39;t lines
+friends_scripts %&lt;&gt;% filter(!str_detect(speaker,
+                                        to_remove))
+
+# Clean up speaker column
+friends_scripts %&lt;&gt;% mutate(speaker = str_replace_all(speaker,
+                                                      to_replace,
+                                                      &quot;&quot;))
+
+# String trim speaker
+friends_scripts %&lt;&gt;% mutate(speaker = str_trim(speaker,
+                                               side = &quot;both&quot;))</code></pre>
+<p>Now that we’ve cleaned things up a bit, let’s investigate to determine if there are any nested lines that need to be broken out.</p>
+<pre class="r"><code># Check for any nested lines
+friends_scripts %&gt;% 
+  filter(str_detect(line,
+                    &quot;[A-Za-z]+:&quot;)) %&gt;% 
+  View()</code></pre>
+<p>There are a few, but for now we’ll leave them. Let’s also see if we can address instances where multiple people say the same line (ie Everyone, All, Both, Joey and Chandler, etc).</p>
+<pre class="r"><code># Split out lines said by multiple people
+# Add line number to each episode in order to later identify lines spoken at the same time
+friends_scripts %&lt;&gt;% 
+  group_by(season_num, episode_num) %&gt;% 
+  mutate(line_num = row_number())
+
+# Identify the 6 main characters
+the_friends &lt;- c(&quot;Chandler&quot;,
+                 &quot;Rachel&quot;,
+                 &quot;Ross&quot;,
+                 &quot;Monica&quot;,
+                 &quot;Joey&quot;,
+                 &quot;Phoebe&quot;)
+
+multi_speaker_separator &lt;- function(speaker){
+  # Takes speaker vector and separates out multiple speakers
+  
+  # Split on And and ,
+  speaker &lt;- str_split(speaker,
+                       &quot; And |, &quot;,
+                       simplify = TRUE)
+  
+  if(length(speaker) == 1){
+    # Cases where speaker is ALl or Everyone
+    # This isn&#39;t perfect - All often means everyone except for the individual who just spoke
+    if(speaker == &quot;All&quot; | speaker == &quot;Everyone&quot;){
+      speaker &lt;- the_friends
+    }
+  }
+  
+  # Ensure speaker is character vector
+  speaker %&lt;&gt;% as.character()
+  
+  # Clean up speaker
+  speaker %&lt;&gt;% str_replace_all(&quot;^And|,&quot;,
+                               &quot;&quot;) %&gt;% 
+    str_trim()
+  
+  speaker
+}
+
+friends_scripts %&lt;&gt;% 
+  mutate(speaker = map(speaker, multi_speaker_separator)) %&gt;% 
+  unnest(speaker)</code></pre>
+</div>
+<div id="celebrate" class="section level2">
+<h2>Celebrate</h2>
+<p>Whew. Pat yourself on the back. Take a breather. We made it! We now have a (fairly) clean dataset containing the script from every episode of Friends. Now that the data is prepared in this way, the opportunities for analysis and discovery are nearly endless. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we’ve done here, let’s save <code>friends_scripts</code> so we can load it in the future.</p>
+</div>
