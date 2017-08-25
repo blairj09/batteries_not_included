@@ -5,6 +5,8 @@ date: '2017-06-19'
 slug: about
 categories: []
 tags: []
+images: ["/img/family.jpg"]
+type: "about"
 ---
 
 ## Me
@@ -13,7 +15,9 @@ I'm a data scientist at [Front Analytics](https://frontanalytics.com/) and a gra
 I'm an avid sports fan and an unashamed bandwagon Warriors fan (although I feel some legitimate connection to the team now that I attend school in the Bay Area). I grew up in Alabama so I'm also a committed Crimson Tide fan. When I'm not spending time with my family or doing data things, I'm often at the stove or at the grill as I consider cooking one of my main hobbies. I love racquetball and look for any opportunity I can to get out and play. Also, funnel cakes and chips and salsa are my ultimate weakness.
 
 ## My family
-I'm married to my incredible wife Brittany and we have two beautiful daughters and a bunny rabbit named Rex. Brittany and I met while we were both undergraduate students at BYU. Her degree is in Early Childhood Education and she taught first grade for 3 years before transitioning to a full time stay at home mom. Our two daughters (Eleanor (Ellie) and Charlotte (Charlie)) consume a large part of our available time. They are the greatest kids in the world (I am a bit biased, but the data I have indicates I'm also correct). Together we enjoy reading (we've amassed quite the home library thanks to my wife's career), watching [Sing](http://m.imdb.com/title/tt3470600/?ref_=m_ttfcd_tt) on repeat, visiting the large collection of local splash pads and water parks (in summer of course), and taking long evening walks. When we have time for just the two of us my wife and I enjoy trying new local restaurants and watching mostly anything produced by the Food Network (we're kind of food people).
+![Family Photo](/img/family.jpg)
+
+I'm married to my incredible wife Brittany and we have two beautiful daughters and a bunny rabbit named Rex. Brittany and I met while we were both undergraduate students at BYU. Her degree is in Early Childhood Education and she taught first grade for 3 years before transitioning to a full time stay at home mom. Our two daughters (Eleanor (Ellie) and Charlotte (Charlie)) consume a large part of our available time. They are the greatest kids in the world (I am a bit biased, but the data I have indicates I'm also correct). Together we enjoy reading (we've amassed quite the home library thanks to my wife's career), watching [Sing](http://m.imdb.com/title/tt3470600/?ref_=m_ttfcd_tt) on repeat, visiting the large collection of local splash pads and water parks (in summer of course), flying kites, and taking long evening walks. When we have time for just the two of us my wife and I enjoy trying new local restaurants and watching mostly anything produced by the Food Network (we're kind of food people).
 
 ## What's in a name
 I thought it would be fair to provide an explanation for the name **Batteries Not Included**. I wish there was a really clever story behind it. Someday maybe I'll make one up. However, the real story is that while competing in a Kaggle competition I was forming a team with some friends and we felt the need to have some sort of clever team name. Since none of us could come up with something compelling, I turned to Google for help and found my way to a [random team name generator](http://www.teamnames.net/fantasy/random-team-name-generator). After a few iterations, the name **Batteries Not Included** came up and it was adopted as our team name. At the conclusion of the competition, I liked the name so much I kept it and decided to make it the name of my blog.

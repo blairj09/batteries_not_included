@@ -1,0 +1,55 @@
+---
+title: Rlang and Quosures and !!! Oh My!
+author: James Blair
+date: '2017-06-28'
+slug: tidyeval
+categories: []
+tags:
+  - R
+  - tidyverse
+  - SoDS17
+draft: true
+description: "Adventures in tidyeval"
+---
+
+
+
+<p>I’ve noticed a lot of recent discussion around the latest version of <a href="http://dplyr.tidyverse.org/"><code>dplyr</code></a> and it’s reliance on the <a href="http://rlang.tidyverse.org/articles/tidy-evaluation.html">tidyeval</a> framework. In fact, twitter has been flooded with references to tidyeval.</p>
+<blockquote class="twitter-tweet" data-lang="en" align="center">
+<p lang="en" dir="ltr">
+Tis the season when many of us are coming to terms with <a href="https://twitter.com/hashtag/tidyeval?src=hash">#tidyeval</a> and feel the need to tell you about it. It's like CrossFit for <a href="https://twitter.com/hashtag/rstats?src=hash">#rstats</a>! 😉 <a href="https://t.co/CcmFteTc6l">https://t.co/CcmFteTc6l</a>
+</p>
+— Jenny Bryan (<span class="citation">@JennyBryan</span>) <a href="https://twitter.com/JennyBryan/status/880114049475682305">June 28, 2017</a>
+</blockquote>
+<script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>
+<blockquote class="twitter-tweet" data-lang="en" align="center">
+<p lang="en" dir="ltr">
+😂😂😂 I broke R. <a href="https://t.co/AWx3Yq2Km2">pic.twitter.com/AWx3Yq2Km2</a>
+</p>
+— Julia Silge (<span class="citation">@juliasilge</span>) <a href="https://twitter.com/juliasilge/status/880493031924809728">June 29, 2017</a>
+</blockquote>
+<script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>
+<blockquote class="twitter-tweet" data-lang="en" align="center">
+<p lang="en" dir="ltr">
+enquo() is dark magic
+</p>
+— Richie Cotton (<span class="citation">@richierocks</span>) <a href="https://twitter.com/richierocks/status/880550984518311937">June 29, 2017</a>
+</blockquote>
+<script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>
+<p>I’ve been a <code>dplyr</code> fan in the past but I must admit I rely mainly on <a href="https://github.com/Rdatatable/data.table/wiki"><code>data.table</code></a> for my day to day data manipulation needs. However, the fact that <code>dplyr</code> interfaces so nicely with multiple backends (specifically <a href="http://spark.rstudio.com/dplyr.html">Spark</a>) provides me with a compelling reason to keep up with it. That and the fact that my boss exclussively opperates in the <a href="http://tidyverse.org">tidyverse</a>. I also appreciate the syntactic sugar that comes free of charge with <code>dplyr</code>.</p>
+<p>With the release of <a href="https://blog.rstudio.org/2017/06/13/dplyr-0-7-0/"><code>dplyr 0.7.0</code></a> (formerly <code>dplyr 0.6.0</code>) there was a major shift in the mechanics driving <code>dplyr's</code> Non Standard Evaluation (NSE). These updated mechanics are based solely on tidyeval principles based on functions contained in the <a href="http://rlang.tidyverse.org/#overview"><code>rlang</code></a> package. As explained in the tidy-evaluation vignette (<code>vignette(&quot;tidy-evaluation&quot;, package = &quot;rlang&quot;)</code>) there are three features of the R language that make NSE possible:</p>
+<ol style="list-style-type: decimal">
+<li>R code is first-class</li>
+<li>Scope is first-class</li>
+<li>Functions can capture expressions that were supplied (as opposed to only capturing their evaluation)</li>
+</ol>
+<p>In this post we’ll examine each of these features with (hopefully) intuitive examples. My goal is to help develop some intuition around tidy evaluation and provide some guidelines to its usage. I’ll extensively rely on both the previously described vignette along with Hadley Wickham’s wonderful book <a href="http://adv-r.hadley.nz/index.html"><em>Advanced R</em></a>.</p>
+<div id="first-class-code" class="section level2">
+<h2>First class code</h2>
+</div>
+<div id="first-class-scope" class="section level2">
+<h2>First class scope</h2>
+</div>
+<div id="section" class="section level2">
+<h2></h2>
+</div>
