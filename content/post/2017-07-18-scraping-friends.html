@@ -13,8 +13,14 @@ tags:
 
 
 
-<p>This post will outline the process of scraping and cleaning the scripts to every <a href="https://en.wikipedia.org/wiki/Friends">Friends</a> TV episode. Subsequent posts will provide various analyses of the cleaned data. The data was scraped from <a href="http://www.livesinabox.com/friends/scripts.shtml">this awesome site</a> that contains links to the <strong>hand trascribed script</strong> for every episode. In an effort to meet suggested guidelines for <a href="https://medium.com/towards-data-science/ethics-in-web-scraping-b96b18136f01">ethical web scraping</a> I emailed the site owner and received permission to scrape the scripts and provide this post as a form of how-to. I also used <a href="http://giorasimchoni.com/2017/06/04/2017-06-04-the-one-with-friends/">this great post</a> for some guidance with the initial approach. With permission and guidance in hand, it’s time to dive into the data.</p>
-<p>First, we need to load the neccessary packages. We’ll use <code>rvest</code> to scrape the data from the web and functions from the <code>tidyverse</code> to clean up the data. I also always load <code>magrittr</code> separate because I often use the <code>%&lt;&gt;%</code> function which isn’t imported in <code>tidyverse</code>.</p>
+<div id="tldr" class="section level2">
+<h2>TL;DR</h2>
+<p>HTML data can be messy and difficult to work with. Tools from the tidyverse (like <code>dlpyr</code>, <code>purrr</code>, and <code>rvest</code>) make this process much easier, althought creating clean data from HTML takes time and patience. Ad hoc testing can be used to quickly evaluate the accuracy of an HTML parsing function. Clean data is well worth the time and effort required to obtain/create it.</p>
+</div>
+<div id="getting-started" class="section level2">
+<h2>Getting Started</h2>
+<p>This post outlines the process of scraping and cleaning the scripts to every <a href="https://en.wikipedia.org/wiki/Friends">Friends</a> TV episode. Subsequent posts will provide various analyses of the cleaned data. The data was scraped from <a href="http://www.livesinabox.com/friends/scripts.shtml">this awesome site</a> that contains links to the <strong>hand trascribed script</strong> for every episode. In an effort to meet suggested guidelines for <a href="https://medium.com/towards-data-science/ethics-in-web-scraping-b96b18136f01">ethical web scraping</a> I emailed the site owner and received permission to scrape the scripts and provide this post as a form of how-to. I also used <a href="http://giorasimchoni.com/2017/06/04/2017-06-04-the-one-with-friends/">this great post</a> for some guidance with the initial approach. With permission and guidance in hand, it’s time to dive into the data.</p>
+<p>First, we need to load the neccessary packages. We’ll use <code>rvest</code> to scrape the data from the web and other packages from the <code>tidyverse</code> to clean up the data. I also always load <code>magrittr</code> separate because I often use the <code>%&lt;&gt;%</code> function which isn’t imported in <code>tidyverse</code>.</p>
 <pre class="r"><code># Packages
 library(tidyverse)
 library(rvest)
@@ -31,10 +37,11 @@ set.seed(35749)
 # Plot settings
 theme_set(theme_ipsum())</code></pre>
 <p>Now that we’re set up and ready to go, let’s take a moment to think through what we need to do in order to build out this data set. 1. Download all scripts with identifying season and episode data 2. Parse all scripts into speaker and line 3. Clean up any errors 4. Celebrate good times</p>
-<p>Let’s get started.</p>
+<p>Seems simple enough. Let’s get started.</p>
+</div>
 <div id="download-scripts" class="section level2">
 <h2>Download Scripts</h2>
-<p>Now, since we want to be respectful of the site we’re pulling data from, we need to make sure that we’re only scraping what we need and scraping as few times as possible. Ideally, we’d be able to pull the html for all episodes at once and then work off of our local copy to perfect the parsing of each episode without needing to re-ping the site for each new episode. With that in mind, I spent some time poking around the site to determine of there was a set structure for each episode url. The idea was if there was a clear pattern, I could write a function to manipulate the base url and pull each script at once. Unfortunately, there isn’t an easily replicable pattern in the urls - most contain a reference to the season and episode number and a short slug referencing the episode title.</p>
+<p>Since we want to be respectful of the site we’re pulling data from, we need to make sure that we’re only scraping what we need as few times as possible. Ideally, we’d be able to pull the html for all episodes at once and then work off of our local copy to perfect the parsing of each episode without needing to re-ping the site for each new episode. With that in mind, I spent some time poking around the site to determine of there was a set structure for each episode url. My idea was that if there was a clear pattern to each url, I could write a function to manipulate the base url and pull each script at once. Unfortunately, there isn’t an easily replicable pattern in the urls - most contain a reference to the season and episode number and a short slug referencing the episode title.</p>
 <pre class="r"><code># Page with links to all episode scripts
 base_url &lt;- &quot;http://www.livesinabox.com/friends/scripts.shtml&quot;
 base_html &lt;- read_html(base_url)
@@ -62,8 +69,8 @@ tibble(url = sample(full_urls, 5))</code></pre>
 ## 3           http://www.livesinabox.com/friends/1006.shtml
 ## 4   http://www.livesinabox.com/friends/season6/602rhr.htm
 ## 5  http://www.livesinabox.com/friends/season2/207rofo.htm</code></pre>
-<p>Notice that the url structure also varies across seasons! However, all is not lost. The main landing page <a href="http://www.livesinabox.com/friends/scripts.shtml">here</a> contains links to each episode script. We can first scrape data from this page to get links to the script for every episode! In fact, we’ve already done that and we have the link to each episode stored in <code>episode_urls</code>. We also have the meta data associated with those links in <code>episode_nodes</code>.</p>
-<p><code>episode_nodes</code> is a xml_nodeset of length 228 containing the complete html for the link to each episode. This means we have access to the link title, which contains the episode title, season number, and episode number. We also have access to the link reference, which is the page with the html of the whole script (we’ve already extracted this as <code>episode_urls</code>. Now lets build out a function that will take the <code>xml_node</code> for each episode, extract the episode url and scrape the script while also providing episode meta data (season number, episode number, and episode title).</p>
+<p>Notice that the url structure varies across seasons! However, all is not lost. The main landing page <a href="http://www.livesinabox.com/friends/scripts.shtml">here</a> contains links to each episode script. We can first scrape data from this page to get links to the script for every episode! In fact, we’ve already done that and we have the link to each episode stored in <code>episode_urls</code>. We also have the meta data associated with those links in <code>episode_nodes</code>.</p>
+<p><code>episode_nodes</code> is a xml_nodeset of length 228 containing the complete html for the link to each episode. This means we have access to the link title, which contains the episode title, season number, and episode number. We also have access to the link reference, which is a reference to the page with the html of the whole script (we’ve already extracted this as <code>episode_urls</code>). Now lets build out a function that will take the <code>xml_node</code> for each episode, extract the episode url and scrape the script associated with that url while also providing episode meta data (season number, episode number, and episode title).</p>
 <pre class="r"><code>scrape_script &lt;- function(xml_node){
   # Scrapes provided url and returns a tibble containing metadata and html_data
   #
@@ -114,7 +121,7 @@ tibble(url = sample(full_urls, 5))</code></pre>
          episode_title,
          html_data = list(html_data))
 }</code></pre>
-<p>Note that this function returns a tibble containing episode metadata along with a list column containing the html from the scraped page. This is a natural application for <code>purrr::map_df</code> in order to create a tibble of the html data for all episodes.</p>
+<p>Note that this function returns a tibble containing episode metadata along with a list column containing the html from a single scraped page. Since we have a list of all episodes (<code>episode_nodes</code>) we can use <code>purrr:map_df</code> to create a tibble of the html data for all episodes.</p>
 <pre class="r"><code># Scrape episodes and put in dataframe
 friends_htmls &lt;- map_df(episode_nodes,
                         scrape_script)</code></pre>
@@ -125,12 +132,12 @@ friends_htmls &lt;- map_df(episode_nodes,
 ## $ episode_num   &lt;dbl&gt; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 1...
 ## $ episode_title &lt;chr&gt; &quot;The Pilot-The Uncut Version&quot;, &quot;The One With The...
 ## $ html_data     &lt;list&gt; [&lt;html&gt;, &lt;html&gt;, &lt;html&gt;, &lt;html&gt;, &lt;html&gt;, &lt;html&gt;...</code></pre>
-<p>We’ve now created a tibble (<code>friends_htmls</code>) that contains a single entry for each episode. Each row containis episode meta data and the full html for that episode. Step 1 of our outline is complete!</p>
+<p>We’ve now created a tibble called <code>friends_htmls</code> that contains a single entry for each episode. Each row contains episode meta data and the full html for that episode. Step 1 of our outline is complete!</p>
 </div>
 <div id="parse-scripts" class="section level2">
 <h2>Parse Scripts</h2>
-<p>Now we’ve come to the tricky part of this process. If the html for each episode followed the same formatting standard, this part would actually be fairly simple since we could write a single parser that would work seamlessly across all episodes. However, some poking around on the site quickly reveals that while there is a general pattern, some episodes definitely beat to the tune of their own drum. For example, take a look at <a href="http://www.livesinabox.com/friends/season9/911work.htm">The One Where Rachel Goes Back to Work</a> and <a href="http://www.livesinabox.com/friends/season9/907song.htm">The One With Ross’s Inappropriate Song</a>. This difference in structure makes it difficult to write a general parser for each episode. However, even across different html structures, there are some similarities across scripts that we can take advantage of.</p>
-<p>First, in every script, the speaker of each line is identified by the name of that speaker followed by a colon (ie <em>Joey: This guy says hello, I wanna kill myself.</em>). While the convention used for identifying the speaker changes (some are all caps, some are not) they all begin with a capital letter and they all have colon before the actual line. Based on this, we can use a <a href="https://en.wikipedia.org/wiki/Regular_expression">regular expression</a> to extract the speaker and identify the associated line. Regular expressions can be a bit tricky, but Hadley Wickham and Garret Grolemund provide a great intro in the <a href="http://r4ds.had.co.nz/strings.html">strings chapter</a> of <a href="http://r4ds.had.co.nz/">R for Data Science</a>. The following parsing function is the result of quite a bit of trial and error, but it provides a good initial approach to parsing the scripts.</p>
+<p>Now we’ve come to the tricky part of this process. If the html for each episode followed the same formatting standard, parsing the html would actually be fairly simple since we could write a single parser that would work seamlessly across all episodes. However, some poking around on the site quickly reveals that while there is a general pattern, some episodes definitely beat to the tune of their own drum. For example, take a look at <a href="http://www.livesinabox.com/friends/season9/911work.htm">The One Where Rachel Goes Back to Work</a> and <a href="http://www.livesinabox.com/friends/season9/907song.htm">The One With Ross’s Inappropriate Song</a>. This difference in structure makes it difficult to write a general parser for each episode. However, even with different html structures, there are some similarities among scripts that we can take advantage of.</p>
+<p>First, in every script the speaker of each line is identified by the name of that speaker followed by a colon (ie <em>Joey: This guy says hello, I wanna kill myself.</em>). While the convention used for labeling the speaker varies (some are all caps, some are not) they all begin with a capital letter and they all have a colon before the actual line. Based on this, we can use a <a href="https://en.wikipedia.org/wiki/Regular_expression">regular expression</a> to extract the speaker and identify the associated line. Regular expressions can be a bit tricky at first, but Hadley Wickham and Garret Grolemund provide a great intro in the <a href="http://r4ds.had.co.nz/strings.html">strings chapter</a> of <a href="http://r4ds.had.co.nz/">R for Data Science</a>. The following parsing function is the result of quite a bit of trial and error, but it provides a good initial approach to parsing the scripts.</p>
 <pre class="r"><code>parse_script &lt;- function(html_data, title = NULL){
   # Parse html reference into dataframe with speaker and line columns
   #
@@ -189,7 +196,7 @@ friends_htmls &lt;- map_df(episode_nodes,
     
   } else {
     # Identify dialogue lines
-    script &lt;- script[str_detect(script, &quot;^[\\w\\. ]+:&quot;)]
+    script &lt;- script[str_detect(script, &quot;^[\\w. ]+:&quot;)]
     
     # Remove new line characters
     script %&lt;&gt;% str_replace_all(&quot;\\n&quot;,
@@ -316,11 +323,12 @@ data_integrity_outliers &lt;- function(friends_script_data){
   
   # Find outliers in nchar speaker
   speaker_outliers &lt;- friends_script_data %&gt;% 
-    select(speaker) %&gt;% 
-    unique %&gt;% 
-    mutate(nchar_speaker = nchar(speaker),
-           pct_rnk = percent_rank(nchar_speaker)) %&gt;% 
-    filter(pct_rnk &lt; .01 | pct_rnk &gt; .99) %&gt;% 
+    group_by(speaker) %&gt;% 
+    summarise(nchar_speaker = nchar(unique(speaker)),
+              count = n(),
+              episodes = list(unique(episode_title))) %&gt;% 
+    mutate(pct_rnk = percent_rank(nchar_speaker)) %&gt;% 
+    filter(pct_rnk &lt; .01 | pct_rnk &gt; .95) %&gt;% 
     arrange(pct_rnk)
   
   list(episode_outliers,
@@ -343,20 +351,20 @@ data_integrity_outliers &lt;- function(friends_script_data){
 ## # ... with 2 more variables: n &lt;int&gt;, pct_rnk &lt;dbl&gt;
 ## 
 ## [[2]]
-## # A tibble: 44 x 3
-##    speaker nchar_speaker     pct_rnk
-##      &lt;chr&gt;         &lt;int&gt;       &lt;dbl&gt;
-##  1      PA             2 0.000000000
-##  2      TV             2 0.000000000
-##  3     All             3 0.002503129
-##  4     Kid             3 0.002503129
-##  5     Bob             3 0.002503129
-##  6     Guy             3 0.002503129
-##  7     Max             3 0.002503129
-##  8     Man             3 0.002503129
-##  9     ALL             3 0.002503129
-## 10     ROB             3 0.002503129
-## # ... with 34 more rows</code></pre>
+## # A tibble: 60 x 5
+##    speaker nchar_speaker count    episodes     pct_rnk
+##      &lt;chr&gt;         &lt;int&gt; &lt;int&gt;      &lt;list&gt;       &lt;dbl&gt;
+##  1      PA             2     1   &lt;chr [1]&gt; 0.000000000
+##  2      TV             2     2   &lt;chr [1]&gt; 0.000000000
+##  3     All             3   304 &lt;chr [113]&gt; 0.002503129
+##  4     ALL             3    33   &lt;chr [9]&gt; 0.002503129
+##  5     Amy             3   119   &lt;chr [2]&gt; 0.002503129
+##  6     Ben             3    68   &lt;chr [9]&gt; 0.002503129
+##  7     BEN             3     5   &lt;chr [1]&gt; 0.002503129
+##  8     Bob             3    18   &lt;chr [3]&gt; 0.002503129
+##  9     Boy             3     1   &lt;chr [1]&gt; 0.002503129
+## 10     Cop             3    14   &lt;chr [1]&gt; 0.002503129
+## # ... with 50 more rows</code></pre>
 <p>Woah, <em>The One With The Mugging</em> currently contains only 24 lines. A quick visit to the <a href="http://www.livesinabox.com/friends/season9/915mug.htm">webpage</a> for that episode reveals that something on our end has gone terribly wrong. Let’s investigate and determine the problem. A good place to start is by stepping through the parsing function with the episode in question.</p>
 <pre class="r"><code># Pull out html for problem episode
 html_data &lt;- friends_htmls %&gt;% 
@@ -370,11 +378,29 @@ html_data &lt;- friends_htmls %&gt;%
 script &lt;- html_nodes(html_data, &quot;p&quot;) %&gt;% 
   html_text()
 
-glimpse(script)</code></pre>
-<pre><code>##  chr [1:2] &quot; Chandler: (excited) Guys, guys, I&#39;ve got great news! Guess what\u0085Joey: Uh, ah, Monica&#39;s pregnant?!Monica: &quot;| __truncated__ ...</code></pre>
-<p>Aha! It looks like we’ve found the bug in the first part part of the parsing script. It looks like this particular episode doesn’t contain the entire script in <code>&lt;p&gt;</code> tags, so when we pull out the html nodes we’re missing the majority of the script. A quick visit back to the <a href="http://www.livesinabox.com/friends/season9/915mug.htm">episode website</a> using <a href="http://selectorgadget.com">selector gadget</a> reveals this is the case. For this particular episode, the entire script is contained within a <code>&lt;body&gt;</code> tag. Armed with this new knowledge, the challenge now is to best determine how to deal with this special case.</p>
-<p>When it comes to handling special cases in parsing there are two distinct approaches that can be taken. So far, we’ve handled each case on it’s own, essentially writing a new parser for each possible format/structure. On the other hand, we could write a single parser that applies to the majority of cases and then work to format special cases to meet the assumptions of that parser. This approach leads to a cleaner parsing function because it’s only dealing with one expected format.</p>
-<p>As we rebuild the parsing function, it will be helpful to quickly spotcheck the performance using a subset of episodes that contain typical episode formatting and edge cases. We can either perform these spot checks manually as we make updates to the parsing function, or we can write some quick test steps to evaluate the performance of the parser using the <code>testthat</code> package.</p>
+writeLines(script)</code></pre>
+<pre><code>##  Chandler: (excited) Guys, guys, I&#39;ve got great news! Guess whatJoey: Uh, ah, Monica&#39;s pregnant?!Monica: (shocked) Really? (She looks around, suddenly embarrassed) 
+##   Let&#39;s get past the moment.Phoebe: What&#39;s your news?Chandler: Thank you. I got a job in advertising. (Everybody cheers)Monica: (hugging Chandler) Oh, honey, that&#39;s incredible!Phoebe: (inquisitive) Gosh, what&#39;s the pay like? (Everybody 
+##   stares at her indignantly) Oh, come on people (defending) come 
+##   on, now, if I don&#39;t know who makes the most, how do I know who I like the most! 
+##   (She looks at Joey) Hey Joey! (Joey winks at her)Chandler: Actually, it pays nothing. It&#39;s an internship.Joey: Oh, that&#39;s cool. We have interns at &#39;Days Of Our Lives&#39;. Chandler: Right. So, it&#39;ll be the same except less sex with you. 
+##   (Joey nods)Ross: So, uh, what kinda stuff do you think they&#39;ll have you do there?Chandler: Well, it&#39;s a training program, but at the end, they hire the 
+##   people they like.Phoebe: (enthusiastic) That&#39;s great.Chandler: Yeah, I mean, there&#39;s probably gonna be some ground work which 
+##   will probably stink, you know, grown man getting people coffee is a little humiliating 
+##   
+##   (At the same time, Gunther puts down a cup of coffee in front of Chandler)Chandler: (grinning awkwardly) Humiliating and noble!
+##   (Gunther shoots a nasty look at him while leaving)Ross: You know, if I didn&#39;t already have a job, I think, I would have 
+##   been really good in advertising.Monica: Ross, you did not come up with &quot;got milk?&quot;Ross: Yes, I did, I did! (He turns to Joey, disappointed) 
+##   I should have written it down! 
+##   
+## [Scene: Monica and Chandler&#39;s Apartment, Monica sits at the table 
+##   reading the mail]Monica: Wow, that&#39;s a big cable bill! Huh, you don&#39;t have a job, but 
+##   you have no problem ordering porn on a Saturday afternoon?! (shocked) 
+##   I was in the house! Ross: (entering) Hey, uhm, Phoebe didn&#39;t by any chance mention 
+##   thatMonica:  that she was the huge guy that mugged you? Yah. Ross: I see. You didn&#39;t happen to tellMonica:  everybody we know? Yeah.Ross: Great. Thanks! (He leaves)</code></pre>
+<p>Aha! It looks like we’ve found the bug in the first part part of the parsing script. For some reason, we’re not grabbing the whole episode from the html. A quick visit back to the <a href="http://www.livesinabox.com/friends/season9/915mug.htm">episode website</a> using <a href="http://selectorgadget.com">selector gadget</a> reveals that the script isn’t entirely contained within <code>&lt;p&gt;</code> tags. For this particular episode, we have to use the <code>&lt;body&gt;</code> tag to get everything. Armed with this new knowledge, the challenge now is to best determine how to deal with this special case.</p>
+<p>When it comes to handling special cases in parsing there are two distinct approaches that can be taken. So far, we’ve handled each case on it’s own, essentially writing a new parser for each possible format/structure. On the other hand, we could write a single parser that applies to the majority of cases and then work to format special cases to meet the assumptions of that parser. I spent a significant amount of time trying to get this second approach to work by extracting the <code>&lt;body&gt;</code> of every episode and parsing that. However, I eventually realized that the results are much cleaner if I continue to parse using the <code>&lt;p&gt;</code> tags when possible and only use <code>&lt;body&gt;</code> when <code>&lt;p&gt;</code> fails.</p>
+<p>While re-configuring the parsing function it will be helpful to quickly spotcheck the performance using a subset of episodes that contain typical episode formatting and edge cases. We can either perform these spot checks manually as we make updates to the parsing function, or we can write some quick tests to evaluate the performance of the parser using the <code>testthat</code> package.</p>
 <blockquote>
 <p>A quick note on <code>testthat</code>: It looks like it has some built in functionality to run interactively within RStudio (given the fact that there is an object called <code>RstudioReporter</code> in the package). However, I have been unable to find documentation on how to use <code>testthat</code> in the optimal way from RStudio. The default implementation, which uses the <code>StopReporter</code>, will throw an error on any failed test. Due to this behavior, the full test suite will not run if any test prior to the final test fails.</p>
 </blockquote>
@@ -394,7 +420,7 @@ parse_tests &lt;- function(parse_fun){
   # Tests parse_fun meets certain expectations when evaluated on test_data
   
   parse_results &lt;- parse_test_data %&gt;% 
-    mutate(script = map(html_data, parse_fun)) %&gt;% 
+    mutate(script = map2(html_data, episode_title, parse_fun)) %&gt;% 
     select(-html_data) %&gt;% 
     unnest(script)
   
@@ -446,10 +472,11 @@ parse_tests &lt;- function(parse_fun){
     expect_false(any(str_detect(parse_results$speaker,
                                 &quot;Yourself&quot;)))
     
-    # expect_false(any(str_detect(parse_results$speaker,
-    #                             &quot;Seven Sisters&quot;)))
+    expect_false(any(str_detect(parse_results$speaker,
+                                &quot;Seven Sisters&quot;)))
   })
 }</code></pre>
+<p>The following updated parsing function is the result of a feedback loop involving updating <code>parse_script</code>, running the test suite in <code>parse_tests</code>, and further adjusting <code>parse_script</code>.</p>
 <pre class="r"><code>parse_script &lt;- function(html_data, title = NULL){
   # Parse html reference into dataframe with speaker and line columns
   #
@@ -461,12 +488,33 @@ parse_tests &lt;- function(parse_fun){
   #  dataframe with speaker and line columns
   
   # Print title if provided
-  if (!is.null(title)) print(title)
+  # if (!is.null(title)) print(title)
   
-  # Extract script
-  script &lt;- html_nodes(html_data, &quot;body&quot;) %&gt;% 
-    html_text()
+  odd_episodes &lt;- c(&quot;The One With The Mugging&quot;,
+                    &quot;The One Where Rachel Goes Back To Work&quot;,
+                    &quot;The One With Ross&#39;s Inappropriate Song&quot;,
+                    &quot;The One Where Dr. Remoray Dies&quot;,
+                    &quot;The One Where Joey Moves Out&quot;,
+                    &quot;The One Where Eddie Moves In&quot;,
+                    &quot;The One Where Old Yeller Dies&quot;,
+                    &quot;The One With The Two Parties&quot;,
+                    &quot;The One With The Chicken Pox&quot;,
+                    &quot;The One With The Prom Video&quot;,
+                    &quot;The One Where Ross and Rachel...You Know&quot;,
+                    &quot;The One With The Bullies&quot;,
+                    &quot;The One With Barry and Mindy&#39;s Wedding&quot;,
+                    &quot;The One With Phoebe&#39;s Dad&quot;)
   
+  # Handle the weird cases
+  if (title %in% odd_episodes) {
+    script &lt;- html_nodes(html_data, &quot;body&quot;) %&gt;% 
+      html_text()
+  } else {
+    # Extract script
+    script &lt;- html_nodes(html_data, &quot;p&quot;) %&gt;% 
+      html_text()
+  }
+
   # Remove anything in parentheses or square brackets
   brackets &lt;- regex(&quot;\\((.*?)\\)|\\[(.*?)\\]|\\{(.*?)\\}&quot;,
                     dotall = TRUE)
@@ -477,10 +525,10 @@ parse_tests &lt;- function(parse_fun){
   remove_unicode &lt;- regex(&quot;\\u0085&quot;)
   
   script %&lt;&gt;% str_replace_all(remove_unicode,
-                              &quot;\n&quot;)
+                              &quot; &quot;)
   
   # Remove unicode character \\u0092
-  remove_unicode &lt;- regex(&quot;\\u0092&quot;)
+  remove_unicode &lt;- regex(&quot;\\u0092|\\u0096&quot;)
   
   script %&lt;&gt;% str_replace_all(remove_unicode,
                               &quot;&quot;)
@@ -494,18 +542,32 @@ parse_tests &lt;- function(parse_fun){
   # Remove quote characters
   script %&lt;&gt;% str_replace_all(&quot;[&#39;\&quot;]&quot;, &quot;&quot;)
   
-  speaker_pattern &lt;- regex(&quot;([.?!]|\\n) ?([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w,&#39;\\-&amp;. ]+:( |\\n)?&quot;)
-  
-  # Extract speaker
-  speaker &lt;- script %&gt;% str_extract_all(speaker_pattern) %&gt;% 
-    unlist
-  
-  # Split script
-  line &lt;- script %&gt;% str_split(speaker_pattern) %&gt;% 
-    unlist
-  
-  # Remove leading line (not associated with speaker)
-  line &lt;- line[-1]
+  # Handle weird episodes
+  if (title %in% odd_episodes) {
+    speaker_pattern &lt;- regex(&quot;([.?!]|\\n) ?([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w,&#39;\\-&amp; ]+:( |\\n)?&quot;)
+    
+    # Extract speaker
+    speaker &lt;- script %&gt;% str_extract_all(speaker_pattern) %&gt;% 
+      unlist()
+    
+    # Split script
+    line &lt;- script %&gt;% str_split(speaker_pattern) %&gt;% 
+      unlist
+    
+    # Remove leading line (not associated with speaker)
+    line &lt;- line[-1]
+  } else {
+    # speaker_pattern &lt;- regex(&quot;([MD][A-Za-z]{1,2}\\. )?[A-Z]{1}[\\w,&#39;\\-&amp;. ]+:( |\\n)?&quot;)
+    speaker_pattern &lt;- regex(&quot;^[\\w\\., ]+:&quot;)
+    
+    script %&lt;&gt;% str_subset(speaker_pattern)
+    
+    speaker &lt;- str_extract_all(script, 
+                               speaker_pattern)
+    line &lt;- str_replace(script, 
+                        speaker_pattern, 
+                        &quot;&quot;)
+  }
   
   # Clean up lines and speaker
   speaker_remove &lt;- regex(&#39;\\&quot;|  # remove quotes
@@ -537,57 +599,46 @@ parse_tests &lt;- function(parse_fun){
 parse_tests(parse_script)</code></pre>
 <p>Once we have a parsing function that passes all our tests, we can run it over the full data again to generate an updated version of <code>friends_scripts</code>.</p>
 <pre class="r"><code>friends_scripts &lt;- friends_htmls %&gt;% 
-  mutate(script = map(html_data, parse_script)) %&gt;% 
+  mutate(script = map2(html_data, episode_title, parse_script)) %&gt;% 
   select(-html_data) %&gt;% 
   unnest(script)</code></pre>
-<p>The parsing still isn’t quite perfect. For example, <a href="http://www.livesinabox.com/friends/1005.shtml">The One Where Rachel’s Sister Babysits</a> has an instance where speaker was parsed as <em>When I Moved In Here I Thought</em>. Given the varied formatting of each episode, it’s difficult to write a parser that correctly distinguishes real speakers but doesn’t identify this value as a speaker. We’ll do some manual cleaning of the data next. Before we get there, let’s run the same diagnostics we previously ran over <code>friends_scripts</code>.</p>
+<p>Now that we have updated <code>friends_scripts</code>, let’s check the integrity of the data using the functions we defined earlier.</p>
 <pre class="r"><code>data_integrity_plots(friends_scripts)</code></pre>
 <p><img src="/post/2017-07-18-scraping-friends_files/figure-html/data-integrity-two-1.png" width="768" /></p>
-<pre class="r"><code>data_integrity_outliers(friends_scripts)</code></pre>
-<pre><code>## [[1]]
-## # A tibble: 6 x 5
-##   season_num episode_num                                   episode_title
-##        &lt;dbl&gt;       &lt;dbl&gt;                                           &lt;chr&gt;
-## 1          1          14                   The One With The Candy Hearts
-## 2          1           8                   The One Where Nana Dies Twice
-## 3          7          12              The One Where They&#39;re Up All Night
-## 4         10          17                                    The Last One
-## 5          9          23                             The One In Barbados
-## 6          4          23 The One With Ross&#39;s Wedding - The Uncut Version
-## # ... with 2 more variables: n &lt;int&gt;, pct_rnk &lt;dbl&gt;
-## 
-## [[2]]
-## # A tibble: 41 x 3
-##    speaker nchar_speaker     pct_rnk
-##      &lt;chr&gt;         &lt;int&gt;       &lt;dbl&gt;
-##  1      Pa             2 0.000000000
-##  2      Tv             2 0.000000000
-##  3     All             3 0.001939864
-##  4     Kid             3 0.001939864
-##  5     Bob             3 0.001939864
-##  6     Guy             3 0.001939864
-##  7     Max             3 0.001939864
-##  8     Man             3 0.001939864
-##  9     Rob             3 0.001939864
-## 10     Roy             3 0.001939864
-## # ... with 31 more rows</code></pre>
-<p>Again, notice the parsing function isn’t perfect - but we’ve handled the special episodes fairly well and we no longer have any episodes with a drastically low number of lines. Episodes with extremely high line counts are actually two-part episodes which were transcribed on the site as a single episode.</p>
+<pre class="r"><code>integrity_tbls &lt;- data_integrity_outliers(friends_scripts)
+integrity_tbls[[2]] %&gt;% 
+  filter(pct_rnk &gt; .5) %&gt;% 
+  unnest(episodes) %&gt;% 
+  arrange(-nchar_speaker, count)</code></pre>
+<pre><code>## # A tibble: 48 x 5
+##                                                                      speaker
+##                                                                        &lt;chr&gt;
+##  1 I Was Living On The Street And I Needed Money For Food And Stuff I Monica
+##  2                                Everyone Almost Simultaneously Except Ross
+##  3                                  Youre Not Supposed To Say Long Pausejoey
+##  4                                      Monica, Chandler, Phoebe, And Rachel
+##  5                                        Chandler, Monica, Joey, And Rachel
+##  6                                         Now, I Really Have To Get Lennart
+##  7                                          Phoebe, Ross, Chandler, And Joey
+##  8                                          Wow, Hey, Heres What We Gonna Do
+##  9                                           Even More Humiliating Than Ross
+## 10                                           You Didnt Happen To Tell Monica
+## # ... with 38 more rows, and 4 more variables: nchar_speaker &lt;int&gt;,
+## #   count &lt;int&gt;, pct_rnk &lt;dbl&gt;, episodes &lt;chr&gt;</code></pre>
+<p>The parsing still isn’t quite perfect. For example, <a href="http://www.livesinabox.com/friends/season9/907song.htm">The One With Ross’s Inappropriate Song</a> has an instance where speaker was parsed as <em>I Dont Know What To Say Ross</em>. Given the varied formatting of each episode, it’s difficult to write a parser that correctly distinguishes real speakers but doesn’t identify this value as a speaker. However, it appears that for the most part our parsing function has performed well.</p>
 </div>
 <div id="clean-scripts" class="section level2">
 <h2>Clean Scripts</h2>
-<p>Now that we have a nice dataset, it’s tempting to call our work complete. However, there’s still quite a bit of work to be done. For example, speaker name misspellings need to be addressed and consideration needs to be given to how to handle lines with multiple speakers. We also need to check to make sure that we correctly captured all lines and don’t have hidden lines nested in other lines.</p>
+<p>Now that we have a nice dataset, it’s tempting to call our work complete. However, there’s still some work to be done. For example, lines that are obviously not actually lines should be removed and consideration needs to be given to how to handle lines with multiple speakers.</p>
 <p>We’ll start by removing any observations that aren’t actually lines and cleaning up the speaker column. We’ll identify these lines by looking at the unique speaker values from least to most common and from longest to shortest.</p>
 <pre class="r"><code>friends_scripts %&gt;% 
   mutate(nchar = str_length(speaker)) %&gt;% 
   group_by(speaker,
            nchar) %&gt;% 
-  summarise(n = n(),
-            lines = list(unique(line)),
-            episodes = list(unique(episode_title))) %&gt;% 
-  arrange(n, -nchar) %&gt;% 
-  View()</code></pre>
+  mutate(n = n()) %&gt;% 
+  arrange(n, -nchar, speaker)</code></pre>
 <pre class="r"><code># Remove bad lines
-to_remove &lt;- &quot;Aired|Copyright|NOTE|Note|Directed|written by|Teleplay|Transcrib|Written|Story|Scene|Recent Updates&quot;
+to_remove &lt;- &quot;Aired|Copyright|Note|Directed|Written By|Teleplay|Transcrib|Written|Story|Scene|Recent Updates|Adjustments&quot;
 to_replace &lt;- &quot;CLOSINGCREDITS|CLOSING CREDITS|Gary Halvorson|OPENINGTITLES|OpeningTitles|OPENING TITLES|Opening Titles&quot;
 
 # Remove lines that aren&#39;t lines
@@ -606,11 +657,9 @@ friends_scripts %&lt;&gt;% mutate(speaker = str_trim(speaker,
 <pre class="r"><code># Check for any nested lines
 friends_scripts %&gt;% 
   filter(str_detect(line,
-                    &quot;[A-Za-z]+:&quot;)) %&gt;% 
-  View()</code></pre>
-<p>There are a few, but for now we’ll leave them. Let’s also see if we can address instances where multiple people say the same line (ie Everyone, All, Both, Joey and Chandler, etc).</p>
-<pre class="r"><code># Split out lines said by multiple people
-# Add line number to each episode in order to later identify lines spoken at the same time
+                    &quot;[A-Za-z]+:&quot;))</code></pre>
+<p>There are very few, so for now we’ll leave them. Let’s also see if we can address instances where multiple people say the same line (ie Everyone, All, Both, Joey and Chandler, etc).</p>
+<pre class="r"><code># Add line number to each episode in order to later identify lines spoken at the same time
 friends_scripts %&lt;&gt;% 
   group_by(season_num, episode_num) %&gt;% 
   mutate(line_num = row_number())
@@ -631,10 +680,10 @@ multi_speaker_separator &lt;- function(speaker){
                        &quot; And |, &quot;,
                        simplify = TRUE)
   
-  if(length(speaker) == 1){
+  if (length(speaker) == 1) {
     # Cases where speaker is ALl or Everyone
     # This isn&#39;t perfect - All often means everyone except for the individual who just spoke
-    if(speaker == &quot;All&quot; | speaker == &quot;Everyone&quot;){
+    if (speaker == &quot;All&quot; | speaker == &quot;Everyone&quot;) {
       speaker &lt;- the_friends
     }
   }
@@ -656,5 +705,8 @@ friends_scripts %&lt;&gt;%
 </div>
 <div id="celebrate" class="section level2">
 <h2>Celebrate</h2>
-<p>Whew. Pat yourself on the back. Take a breather. We made it! We now have a (fairly) clean dataset containing the script from every episode of Friends. Now that the data is prepared in this way, the opportunities for analysis and discovery are nearly endless. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we’ve done here, let’s save <code>friends_scripts</code> so we can load it in the future.</p>
+<p>Whew. Pat yourself on the back. Take a breather. We made it! At this point, we’ll call our work complete for now. There are still some data cleaning tasks that can be performed (standardizing mispelled speaker names and dealing with nested lines) but we have a resonably clean data set that provides a foundation for future analyses. At some point I may revisit this to clean the data up a bit more, but for now we’ll accept what we have and move on.</p>
+<p>Our final <code>friends_scripts</code> is a tibble with 6 columns and 63122 rows containing the script from every Friends episode. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we’ve done here, let’s save <code>friends_scripts</code> so we can load it in the future.</p>
+<pre class="r"><code>saveRDS(friends_scripts,
+        file = &quot;../../data/friends/friends_scripts.Rds&quot;)</code></pre>
 </div>
