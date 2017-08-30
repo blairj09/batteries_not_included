@@ -9,6 +9,7 @@ tags:
   - R
   - testthat
   - SoDS17
+images: ["/img/ad_hoc_testing.png"]
 ---
 
 
@@ -157,7 +158,7 @@ print(&quot;Testing is done&quot;)</code></pre>
 </div>
 <div id="passing-additional-information" class="section level2">
 <h2>Passing Additional Information</h2>
-<p>There are times when it’s helpful to pass additional information to test results so that failure messages are more informative. For example, in my post about <a href="2017-07-18-scraping-friends.html">scraping Friends data</a> I used <code>testthat</code> to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the <code>info</code> argument to any <code>expect_...</code> function. This can be especially powerful when testing a function over several cases (like several episodes). What’s nice is that tests can be run over a collection of data using <code>purrr::map()</code> or <code>purr::map2()</code>.</p>
+<p>There are times when it’s helpful to pass additional information to test results so that failure messages are more informative. For example, in my post about scraping Friends data I used <code>testthat</code> to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the <code>info</code> argument to any <code>expect_...</code> function. This can be especially powerful when testing a function over several cases (like several episodes). What’s nice is that tests can be run over a collection of data using <code>purrr::map()</code> or <code>purr::map2()</code>.</p>
 <pre class="r"><code>set.seed(35749)
 
 test_data &lt;- dplyr::tibble(x = 1:100,

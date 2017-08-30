@@ -9,6 +9,7 @@ tags:
   - R
   - testthat
   - SoDS17
+images: ["/img/ad_hoc_testing.png"]
 ---
 ```{r setup, echo=FALSE, include=FALSE}
 # knitr options
@@ -119,7 +120,7 @@ print("Testing is done")
 And just like that we have ad hoc informative testing that identifies tests that failed along with the function that was being tested at the time of failure.
 
 ## Passing Additional Information
-There are times when it's helpful to pass additional information to test results so that failure messages are more informative. For example, in my post about [scraping Friends data](2017-07-18-scraping-friends.html) I used `testthat` to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the `info` argument to any `expect_...` function. This can be especially powerful when testing a function over several cases (like several episodes). What's nice is that tests can be run over a collection of data using `purrr::map()` or `purr::map2()`.
+There are times when it's helpful to pass additional information to test results so that failure messages are more informative. For example, in my post about scraping Friends data I used `testthat` to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the `info` argument to any `expect_...` function. This can be especially powerful when testing a function over several cases (like several episodes). What's nice is that tests can be run over a collection of data using `purrr::map()` or `purr::map2()`.
 
 ```{r info-argument}
 set.seed(35749)
