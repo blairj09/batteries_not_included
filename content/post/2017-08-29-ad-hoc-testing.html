@@ -1,0 +1,192 @@
+---
+title: Ad Hoc Testing
+description: A suggested testing workflow in RStudio
+author: James Blair
+date: '2017-08-29'
+slug: ad-hoc-testing
+categories: []
+tags:
+  - R
+  - testthat
+  - SoDS17
+images: ["/img/ad_hoc_testing.png"]
+---
+
+
+
+<div id="tldr" class="section level2">
+<h2>TL;DR</h2>
+<p><a href="https://github.com/hadley/testthat"><code>testthat</code></a> provides a convenient and easy to use unit test framework for R. While traditionally used as a formal part of <a href="http://r-pkgs.had.co.nz/tests.html">package development</a>, it can also be used interactively. Ad hoc test suites can be run as functions within an R session to quickly test the impact of code changes. I use this workflow when writing parsing functions for HTML data.</p>
+</div>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>Like all Hadley Wickham creations, <code>testthat</code> is a wonderful tool that generally improves the lives of R users. As stated upfront in the package documentation, <code>testthat</code> was designed to make R testing both easy and fun. As a unit test framework, it should come as no surprise that the main use case for <code>testthat</code> is unit testing for R packages. The typical unit testing workflow is described in detail <a href="http://r-pkgs.had.co.nz/tests.html">here</a>.</p>
+<p>While package development is certainly a core component of R programming, there are times when I’m developing code that I want tested but that doesn’t necessarily belong in a package. The most common use case I encounter is when I’m creating functions to parse html text. In this instance, the function I’m writing is unique to the structure of the text I’m parsing and therefore unsuitable for more general use, making it a poor condidate for package inclusion. However, I enjoy the capability of <code>testthat</code> to easily define test expectations (using the <code>expect_</code> family of functions) as well as deliver helpful information on test failure. The following examples illustrate ways <code>testthat</code> can be used interactively within RStudio.</p>
+</div>
+<div id="testing-examples" class="section level2">
+<h2>Testing Examples</h2>
+<p>Before diving in to the examples it’s necessary to load the <code>testthat</code> package.</p>
+<pre class="r"><code>library(testthat)</code></pre>
+<p><code>testthat</code> tests typically follow this convention:</p>
+<pre class="r"><code>context(&quot;&lt;Overall Label&gt;&quot;)
+
+test_that(&quot;&lt;Single Test Label&gt;&quot;, {
+  expect_...(&lt;expectation&gt;)
+  expect_...(&lt;expectation&gt;)
+})
+
+test_that(&quot;&lt;Single Test Label&gt;&quot;, {
+  expect_...(&lt;expectation&gt;)
+  expect_...(&lt;expectation&gt;)
+})</code></pre>
+<p><code>context()</code> provides the overall context of the tests, <code>test_that()</code> provides specific tests, and <code>expect_...</code> is any of the expectation functions provided by <code>testthat</code>. This format is designed to work well with unit testing and with a little work it can also work well interactiely.</p>
+<p>Unit tests are typically designed with a set function name in mind - that is, the function being tested will always have the same name, it may just have an updated definition. However, when testing interactively, I find that sometimes I want to test two different versions of a function to compare their behavior. In this case, I need the ability to tell the test what function I want it to use. This can be accomplished by wrapping testing in a function that takes the function to be tested as an argument. The following contrived example illustrates this point.</p>
+<pre class="r"><code>add_1 &lt;- function(x, y){
+  x + y
+}
+
+add_2 &lt;- function(x, y){
+  x * y
+}
+
+test_add &lt;- function(add_fun){
+  test_that(&quot;Integers are correctly added&quot;, {
+    expect_equal(add_fun(0, 0), 0)
+    expect_equal(add_fun(1, 1), 2)
+    expect_equal(add_fun(1, 2), 3)
+    expect_equal(add_fun(4, 5), 9)
+  })
+}
+
+test_add(add_1)
+test_add(add_2)</code></pre>
+<pre><code>## Error: Test failed: &#39;Integers are correctly added&#39;
+## * add_fun(1, 1) not equal to 2.
+## 1/1 mismatches
+## [1] 1 - 2 == -1
+## 
+## * add_fun(1, 2) not equal to 3.
+## 1/1 mismatches
+## [1] 2 - 3 == -1
+## 
+## * add_fun(4, 5) not equal to 9.
+## 1/1 mismatches
+## [1] 20 - 9 == 11</code></pre>
+<pre class="r"><code>print(&quot;Testing is done&quot;)</code></pre>
+<pre><code>## [1] &quot;Testing is done&quot;</code></pre>
+<p>Now, this testing function is flexible because it allows any function to be passed in and tested against the established expectations. If you run the above code, you’ll notice that an error gets thrown when a test isn’t passed. While this can be desired behavior at times, other times I would rather just be informed about failed tests instead of bringing my script (or code chunk) to a grinding halt. Luckily, <code>testthat</code> includes different reporters that handle failed tests differently. The default reporter is the <code>StopReporter</code> which, as its name suggests, stops code evaluation when a test fails. Using the <code>RStudioReporter</code> or the <code>SummaryReporter</code> provides test details without stopping R when a test fails. Personally I prefer the verbosity of <code>SummaryReporter</code>. Note that while <code>testthat</code> provides the <code>set_reporter()</code> function, I found it easier to use <code>with_reporter()</code> to define the reporter used for a given group of tests.</p>
+<pre class="r"><code>test_add &lt;- function(add_fun){
+  with_reporter(SummaryReporter, {
+    test_that(&quot;Integers are correctly added&quot;, {
+      expect_equal(add_fun(0, 0), 0)
+      expect_equal(add_fun(1, 1), 2)
+      expect_equal(add_fun(1, 2), 3)
+      expect_equal(add_fun(4, 5), 9)
+    })
+  })
+}
+
+test_add(add_1)
+test_add(add_2)
+print(&quot;Testing is done&quot;)</code></pre>
+<pre><code>## ....
+## DONE ======================================================================
+## .123
+## Failed --------------------------------------------------------------------
+## 1. Failure: Integers are correctly added (@&lt;text&gt;#5) ----------------------
+## add_fun(1, 1) not equal to 2.
+## 1/1 mismatches
+## [1] 1 - 2 == -1
+## 
+## 
+## 2. Failure: Integers are correctly added (@&lt;text&gt;#6) ----------------------
+## add_fun(1, 2) not equal to 3.
+## 1/1 mismatches
+## [1] 2 - 3 == -1
+## 
+## 
+## 3. Failure: Integers are correctly added (@&lt;text&gt;#7) ----------------------
+## add_fun(4, 5) not equal to 9.
+## 1/1 mismatches
+## [1] 20 - 9 == 11
+## 
+## 
+## DONE ======================================================================
+## [1] &quot;Testing is done&quot;</code></pre>
+<p>In this case even though there are code failures the chunk runs to completion. The clean output makes it possible to identify where failures occured and what specifically went wrong. However, one remaining problem is that there’s no way to differentiate in the test results what version of the function was being tested since the generic <code>add_fun()</code> from <code>test_add()</code> is all that’s reported. In this case it’s not a big deal because there are only two functions being tested and since we test them in succession it’s easy to identify which test results correspond with which function. However, if we were testing a larger collection of functions this would be a hastle. Luckily, using <code>context()</code> and some <code>rlang</code> magic, we can provide insight into which function is associated with each set of test results.</p>
+<pre class="r"><code>test_add &lt;- function(add_fun){
+  with_reporter(SummaryReporter, {
+    add_fun_name &lt;- rlang::quo_name(rlang::enquo(add_fun))
+    context(add_fun_name)
+    test_that(&quot;Integers are correctly added&quot;, {
+      expect_equal(add_fun(0, 0), 0)
+      expect_equal(add_fun(1, 1), 2)
+      expect_equal(add_fun(1, 2), 3)
+      expect_equal(add_fun(4, 5), 9)
+    })
+  })
+}
+
+test_add(add_1)
+test_add(add_2)
+print(&quot;Testing is done&quot;)</code></pre>
+<pre><code>## add_1: ....
+## DONE ======================================================================
+## add_2: .123
+## Failed --------------------------------------------------------------------
+## 1. Failure: Integers are correctly added (@&lt;text&gt;#7) ----------------------
+## add_fun(1, 1) not equal to 2.
+## 1/1 mismatches
+## [1] 1 - 2 == -1
+## 
+## 
+## 2. Failure: Integers are correctly added (@&lt;text&gt;#8) ----------------------
+## add_fun(1, 2) not equal to 3.
+## 1/1 mismatches
+## [1] 2 - 3 == -1
+## 
+## 
+## 3. Failure: Integers are correctly added (@&lt;text&gt;#9) ----------------------
+## add_fun(4, 5) not equal to 9.
+## 1/1 mismatches
+## [1] 20 - 9 == 11
+## 
+## 
+## DONE ======================================================================
+## [1] &quot;Testing is done&quot;</code></pre>
+<p>And just like that we have ad hoc informative testing that identifies tests that failed along with the function that was being tested at the time of failure.</p>
+</div>
+<div id="passing-additional-information" class="section level2">
+<h2>Passing Additional Information</h2>
+<p>There are times when it’s helpful to pass additional information to test results so that failure messages are more informative. For example, in my post about scraping Friends data I used <code>testthat</code> to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the <code>info</code> argument to any <code>expect_...</code> function. This can be especially powerful when testing a function over several cases (like several episodes). What’s nice is that tests can be run over a collection of data using <code>purrr::map()</code> or <code>purr::map2()</code>.</p>
+<pre class="r"><code>set.seed(35749)
+
+test_data &lt;- dplyr::tibble(x = 1:100,
+                    y = rnorm(100))
+
+with_reporter(SummaryReporter, {
+  test_that(&quot;y less than 2&quot;, {
+    test_data %&gt;% 
+      mutate(test = map2(y, x, function(y, x) {expect_true(y &lt; 2,
+                                        info = glue::glue(&quot;x = {x}; y = {y}&quot;))}))
+  })
+})</code></pre>
+<pre><code>## 1
+## Failed --------------------------------------------------------------------
+## 1. Error: y less than 2 (@&lt;text&gt;#8) ---------------------------------------
+## could not find function &quot;mutate&quot;
+## 1: test_data %&gt;% mutate(test = map2(y, x, function(y, x) {
+##        expect_true(y &lt; 2, info = glue::glue(&quot;x = {x}; y = {y}&quot;))
+##    })) at &lt;text&gt;:8
+## 2: withVisible(eval(quote(`_fseq`(`_lhs`)), env, env))
+## 3: eval(quote(`_fseq`(`_lhs`)), env, env)
+## 4: eval(quote(`_fseq`(`_lhs`)), env, env)
+## 5: `_fseq`(`_lhs`)
+## 6: freduce(value, `_function_list`)
+## 7: withVisible(function_list[[k]](value))
+## 8: function_list[[k]](value)
+## 
+## DONE ======================================================================</code></pre>
+<p>While this is once again a clearly contrived case, hoepfully it is clear to see how this type of convention could be useful in a more realistic setting - particularly when additional details about the failed test are required. In this particular example, we’re able to see the <code>x</code> and <code>y</code> value of each observation that failed the test. This makes it very simple to identify and address failing edge cases.</p>
+<p>To be clear, I’m not suggesting this workflow replace unit testing in any way. I’ve simply found this workflow useful when I’m evaluating the effectiveness of different functions on specific tasks with a high volume of edge cases (primarily parsing html).</p>
+</div>
