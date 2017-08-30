@@ -417,57 +417,58 @@ parse_tests <- function(parse_fun){
     mutate(script = map2(html_data, episode_title, parse_fun)) %>% 
     select(-html_data) %>% 
     unnest(script)
-  
-  test_that("All episodes present in parsed data", {
-    difference <- setdiff(unique(parse_test_data$episode_title),
-                          unique(parse_results$episode_title))
+  with_reporter(SummaryReporter, {
+    test_that("All episodes present in parsed data", {
+      difference <- setdiff(unique(parse_test_data$episode_title),
+                            unique(parse_results$episode_title))
+      
+      expect_true(length(difference) == 0,
+                  info = glue::glue("Missed: {difference}"))
+    })
     
-    expect_true(length(difference) == 0,
-                info = glue::glue("Missed: {difference}"))
-  })
-  
-  test_that("Number of lines per episode appears correct", {
-    line_counts <- parse_results %>% 
-      group_by(episode_title) %>% 
-      count()
+    test_that("Number of lines per episode appears correct", {
+      line_counts <- parse_results %>% 
+        group_by(episode_title) %>% 
+        count()
+      
+      # Low line counts
+      line_counts %>% 
+        mutate(test = map(n, ~expect_true(n >= 190,
+                                          info = glue::glue("Episode: {episode_title}\t Lines: {n}"))))
+      
+      # High line counts
+      line_counts %>% 
+        mutate(test = map(n, ~expect_true(n <= 200,
+                                          info = glue::glue("Episode: {episode_title}\t Lines: {n}"))))
+    })
     
-    # Low line counts
-    line_counts %>% 
-      mutate(test = map(n, ~expect_true(n >= 190,
-                                        info = glue::glue("Episode: {episode_title}\t Lines: {n}"))))
-    
-    # High line counts
-    line_counts %>% 
-      mutate(test = map(n, ~expect_true(n <= 400,
-                                        info = glue::glue("Episode: {episode_title}\t Lines: {n}"))))
-  })
-  
-  # Test correct speaker parsing
-  test_that("Speaker has been parsed correctly", {
-    # Check that Mr. Mrs. and Dr. distinctions are correctly included
-    expect_match(parse_results$speaker,
-                 "[MD][A-Za-z]{0,2}\\.",
-                 all = FALSE)
-    
-    # Check that fireman characters are included
-    expect_match(parse_results$speaker,
-                 "Fireman",
-                 all = FALSE)
-    
-    # Check that multi-speaker lines are included
-    expect_match(parse_results$speaker,
-                 " And ",
-                 all = FALSE)
-    
-    # Check that certain edge phrases aren't considered speakers
-    expect_false(any(str_detect(parse_results$speaker,
-                                "Signs")))
-    
-    expect_false(any(str_detect(parse_results$speaker,
-                                "Yourself")))
-    
-    expect_false(any(str_detect(parse_results$speaker,
-                                "Seven Sisters")))
+    # Test correct speaker parsing
+    test_that("Speaker has been parsed correctly", {
+      # Check that Mr. Mrs. and Dr. distinctions are correctly included
+      expect_match(parse_results$speaker,
+                   "[MD][A-Za-z]{0,2}\\.",
+                   all = FALSE)
+      
+      # Check that fireman characters are included
+      expect_match(parse_results$speaker,
+                   "Fireman",
+                   all = FALSE)
+      
+      # Check that multi-speaker lines are included
+      expect_match(parse_results$speaker,
+                   " And ",
+                   all = FALSE)
+      
+      # Check that certain edge phrases aren't considered speakers
+      expect_false(any(str_detect(parse_results$speaker,
+                                  "Signs")))
+      
+      expect_false(any(str_detect(parse_results$speaker,
+                                  "Yourself")))
+      
+      expect_false(any(str_detect(parse_results$speaker,
+                                  "Seven Sisters")))
+    })
   })
 }
 ```
@@ -492,8 +493,10 @@ parse_script <- function(html_data, title = NULL){
                     "The One Where Rachel Goes Back To Work",
                     "The One With Ross's Inappropriate Song",
                     "The One Where Dr. Remoray Dies",
+                    "The One After the Superbowl",
                     "The One Where Joey Moves Out",
                     "The One Where Eddie Moves In",
+                    "The One Where Eddie Won't Go",
                     "The One Where Old Yeller Dies",
                     "The One With The Two Parties",
                     "The One With The Chicken Pox",
@@ -600,8 +603,8 @@ parse_tests(parse_script)
 ```{r parse-debugging, include = FALSE}
 # Pull out html for problem episode
 html_data <- friends_htmls %>% 
-  # filter(season_num == 3 & episode_num == 3) %$%
-  filter(episode_title == "The One With The Soap Opera Party") %$%
+  filter(season_num == 2 & episode_num == 19) %$%
+  # filter(episode_title == "The One With The Soap Opera Party") %$%
   html_data %>% 
   .[[1]]
 ```
@@ -719,12 +722,46 @@ friends_scripts %<>%
   unnest(speaker)
 ```
 
+The final step we'll take for now is to standardize the main characters names. There are instances where instead of using the full name certain speakers are identified with shortened nicknames (ie Rach instead of Rachel).
+
+```{r speaker-standardization}
+friends_scripts %<>% 
+  mutate(speaker = case_when(speaker == "Rach" ~ "Rachel",
+                             speaker == "Phoe" ~ "Phoebe",
+                             speaker == "Mnca" ~ "Monica",
+                             speaker == "Chan" ~ "Chandler",
+                             TRUE ~ speaker))
+```
+
+Now that the most frequent speaker abbreviations have been adjusted, let's validate the following assumption: the six main characters should show up in the top 10 speakers for each episode.
+```{r standardization-tests}
+friends_scripts %>% 
+  group_by(season_num,
+           episode_num) %>% 
+  count(speaker) %>% 
+  top_n(10, n) %>% 
+  group_by(speaker) %>% 
+  summarise(n = n()) %>% 
+  arrange(-n) %>% 
+  head(6)
+```
+
+Based on this view, all main characters show up in the top ten characters for each episode. For now, our data cleaning work is done.
+
 ## Celebrate
 Whew. Pat yourself on the back. Take a breather. We made it! At this point, we'll call our work complete for now. There are still some data cleaning tasks that can be performed (standardizing mispelled speaker names and dealing with nested lines) but we have a resonably clean data set that provides a foundation for future analyses. At some point I may revisit this to clean the data up a bit more, but for now we'll accept what we have and move on. 
 
 Our final `friends_scripts` is a tibble with `r ncol(friends_scripts)` columns and `r nrow(friends_scripts)` rows containing the script from every Friends episode. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we've done here, let's save `friends_scripts` so we can load it in the future.
 
 ```{r save-data, eval=FALSE}
+friends_scripts %<>% select(season_num,
+                            episode_num,
+                            episode_title,
+                            speaker,
+                            line,
+                            line_num) %>% 
+  ungroup()
+
 saveRDS(friends_scripts,
         file = "../../data/friends/friends_scripts.Rds")
 ```

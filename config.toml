@@ -8,6 +8,10 @@ canonifyurls = true
 paginate = 5
 ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_files$", "_cache$"]
 
+# New highlighting
+pygmentsstyle = "bw"
+pygmentscodefences = true
+
 [indexes]
   tag = "tags"
   topic = "topics"
@@ -17,8 +21,12 @@ ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_files$", "_cache$"]
   subtitle = "IID observations from a universe of data"
   googleAnalytics = "UA-102003942-1"
   # CSS name for highlight.js
-  highlightjs = "atom-one-dark"
+  # highlightjs = "atom-one-dark"
   dateFormat = "02 Jan 2006"
+  highlight = true
+  highlightStyle = "atelier-forest-light"
+  highlightLanguages = ["python", "r", "sql", "markdown"]
+  font = ["Raleway", "Arvo", "Roboto Mono"]
 
 [menu]
   # Shown in the side menu.
