@@ -20,10 +20,10 @@ knitr::opts_chunk$set(results = "hold",
 
 
 ## TL;DR
-`testthat` provides a convenient and easy to use unit test framework for R. While traditionally used as a formal part of [package development](http://r-pkgs.had.co.nz/tests.html), it can also be used interactively. Ad hoc testing suites can be run as functions within an R session to quickly test the impact of code changes. I use this workflow when writing parsing functions for HTML data.
+[`testthat`](https://github.com/hadley/testthat) provides a convenient and easy to use unit test framework for R. While traditionally used as a formal part of [package development](http://r-pkgs.had.co.nz/tests.html), it can also be used interactively. Ad hoc test suites can be run as functions within an R session to quickly test the impact of code changes. I use this workflow when writing parsing functions for HTML data.
 
 ## Introduction
-Like all Hadley Wickham creations, `testthat` is a wonderful tool that generally improves the lives of R users. As stated upfront in the package documentation, `testthat` was designed to make testing both easy and fun for R users. As a unit test framework, it should come as no surprise that the main use case for `testthat` is unit testing for R packages. The typical unit testing workflow is described in detail [here](http://r-pkgs.had.co.nz/tests.html).
+Like all Hadley Wickham creations, `testthat` is a wonderful tool that generally improves the lives of R users. As stated upfront in the package documentation, `testthat` was designed to make R testing both easy and fun. As a unit test framework, it should come as no surprise that the main use case for `testthat` is unit testing for R packages. The typical unit testing workflow is described in detail [here](http://r-pkgs.had.co.nz/tests.html).
 
 While package development is certainly a core component of R programming, there are times when I'm developing code that I want tested but that doesn't necessarily belong in a package. The most common use case I encounter is when I'm creating functions to parse html text. In this instance, the function I'm writing is unique to the structure of the text I'm parsing and therefore unsuitable for more general use, making it a poor condidate for package inclusion. However, I enjoy the capability of `testthat` to easily define test expectations (using the `expect_` family of functions) as well as deliver helpful information on test failure. The following examples illustrate ways `testthat` can be used interactively within RStudio.
 
@@ -51,7 +51,7 @@ test_that("<Single Test Label>", {
 
 `context()` provides the overall context of the tests, `test_that()` provides specific tests, and `expect_...` is any of the expectation functions provided by `testthat`. This format is designed to work well with unit testing and with a little work it can also work well interactiely. 
 
-Unit tests are designed with a set function name in mind - that is, the function being tested will always have the same name, it may just have an updated definition. However, when testing interactively, I find that sometimes I want to test two different versions of a function to compare their behavior. In this case, I need the ability to tell the test what function I want it to use. This can be accomplished by wrapping testing in a function that takes the function to be tested as an argument. The following contrived example illustrates this point.
+Unit tests are typically designed with a set function name in mind - that is, the function being tested will always have the same name, it may just have an updated definition. However, when testing interactively, I find that sometimes I want to test two different versions of a function to compare their behavior. In this case, I need the ability to tell the test what function I want it to use. This can be accomplished by wrapping testing in a function that takes the function to be tested as an argument. The following contrived example illustrates this point.
 
 ```{r example-1}
 add_1 <- function(x, y){
@@ -64,10 +64,8 @@ add_2 <- function(x, y){
 
 test_add <- function(add_fun){
   test_that("Integers are correctly added", {
-    expect_equal(add_fun(0, 0), 0,
-                 info = quo_name(add_fun))
-    expect_equal(add_fun(1, 1), 2,
-                 info = quo_name(add_fun))
+    expect_equal(add_fun(0, 0), 0)
+    expect_equal(add_fun(1, 1), 2)
     expect_equal(add_fun(1, 2), 3)
     expect_equal(add_fun(4, 5), 9)
   })
@@ -97,7 +95,7 @@ test_add(add_2)
 print("Testing is done")
 ```
 
-In this case even though there are code failures the chunk runs to completion. It possible to identify where the errors occured and what specifically went wrong in a nice format. However, one remaining problem is that there's no way to differentiate in the test results what version of the function is being tested since the generic `add_fun()` from `test_add()` is all that's reported. In this case it's not a big deal because there are only two functions being tested and since we test them in succession it's easy to identify which test corresponds with which function. However, if we were testing a larger collection of functions this would be a hastle. Luckily, using `testthat::context()` and some `rlang` magic, we can provide insight into which function is associated with each set of test results.
+In this case even though there are code failures the chunk runs to completion. The clean output makes it possible to identify where failures occured and what specifically went wrong. However, one remaining problem is that there's no way to differentiate in the test results what version of the function was being tested since the generic `add_fun()` from `test_add()` is all that's reported. In this case it's not a big deal because there are only two functions being tested and since we test them in succession it's easy to identify which test results correspond with which function. However, if we were testing a larger collection of functions this would be a hastle. Luckily, using `context()` and some `rlang` magic, we can provide insight into which function is associated with each set of test results.
 
 ```{r context}
 test_add <- function(add_fun){
@@ -118,10 +116,10 @@ test_add(add_2)
 print("Testing is done")
 ```
 
-And just like that we have ad hoc informative testing that identifies tests that failed along with the function that was being tested at the time of failure. To be clear, I'm not suggesting this replace unit testing in any way. I've simply found this workflow useful when I'm evaluating the effectiveness of different functions on specific tasks with a high volume of edge cases (primarily parsing html).
+And just like that we have ad hoc informative testing that identifies tests that failed along with the function that was being tested at the time of failure.
 
 ## Passing Additional Information
-There are times when it's helpful to pass additional information to the test results so that messages are more informative. For example, in my post about [scraping Friends data]() I used `testthat` to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the `info` argument to any `expect_...` function. This can be especially powerful when testing a function over several cases (like several episodes). What's nice is that tests can be run over a collection of data using `purrr::map()` or `purr::map2()`.
+There are times when it's helpful to pass additional information to test results so that failure messages are more informative. For example, in my post about [scraping Friends data](2017-07-18-scraping-friends.html) I used `testthat` to check that certain expectations were met for each episode I parsed. When a test failed, it was helpful to know which particular episode the test failed on so that I could investigate the problem further. This can be accomplished by providing the `info` argument to any `expect_...` function. This can be especially powerful when testing a function over several cases (like several episodes). What's nice is that tests can be run over a collection of data using `purrr::map()` or `purr::map2()`.
 
 ```{r info-argument}
 set.seed(35749)
@@ -138,4 +136,6 @@ with_reporter(SummaryReporter, {
 })
 ```
 
-While this is once again a clearly contrived case, hoepfully it is clear to see how this type of convention could be useful in a more realistic setting - particularly when additional details about the failed test are required. In this case, we're able to see the `x` and `y` value of each observation that failed the test.
+While this is once again a clearly contrived case, hoepfully it is clear to see how this type of convention could be useful in a more realistic setting - particularly when additional details about the failed test are required. In this particular example, we're able to see the `x` and `y` value of each observation that failed the test. This makes it very simple to identify and address failing edge cases.
+
+To be clear, I'm not suggesting this workflow replace unit testing in any way. I've simply found this workflow useful when I'm evaluating the effectiveness of different functions on specific tasks with a high volume of edge cases (primarily parsing html).

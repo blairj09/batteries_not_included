@@ -423,57 +423,58 @@ parse_tests &lt;- function(parse_fun){
     mutate(script = map2(html_data, episode_title, parse_fun)) %&gt;% 
     select(-html_data) %&gt;% 
     unnest(script)
-  
-  test_that(&quot;All episodes present in parsed data&quot;, {
-    difference &lt;- setdiff(unique(parse_test_data$episode_title),
-                          unique(parse_results$episode_title))
+  with_reporter(SummaryReporter, {
+    test_that(&quot;All episodes present in parsed data&quot;, {
+      difference &lt;- setdiff(unique(parse_test_data$episode_title),
+                            unique(parse_results$episode_title))
+      
+      expect_true(length(difference) == 0,
+                  info = glue::glue(&quot;Missed: {difference}&quot;))
+    })
     
-    expect_true(length(difference) == 0,
-                info = glue::glue(&quot;Missed: {difference}&quot;))
-  })
-  
-  test_that(&quot;Number of lines per episode appears correct&quot;, {
-    line_counts &lt;- parse_results %&gt;% 
-      group_by(episode_title) %&gt;% 
-      count()
+    test_that(&quot;Number of lines per episode appears correct&quot;, {
+      line_counts &lt;- parse_results %&gt;% 
+        group_by(episode_title) %&gt;% 
+        count()
+      
+      # Low line counts
+      line_counts %&gt;% 
+        mutate(test = map(n, ~expect_true(n &gt;= 190,
+                                          info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
+      
+      # High line counts
+      line_counts %&gt;% 
+        mutate(test = map(n, ~expect_true(n &lt;= 200,
+                                          info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
+    })
     
-    # Low line counts
-    line_counts %&gt;% 
-      mutate(test = map(n, ~expect_true(n &gt;= 190,
-                                        info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
-    
-    # High line counts
-    line_counts %&gt;% 
-      mutate(test = map(n, ~expect_true(n &lt;= 400,
-                                        info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
-  })
-  
-  # Test correct speaker parsing
-  test_that(&quot;Speaker has been parsed correctly&quot;, {
-    # Check that Mr. Mrs. and Dr. distinctions are correctly included
-    expect_match(parse_results$speaker,
-                 &quot;[MD][A-Za-z]{0,2}\\.&quot;,
-                 all = FALSE)
-    
-    # Check that fireman characters are included
-    expect_match(parse_results$speaker,
-                 &quot;Fireman&quot;,
-                 all = FALSE)
-    
-    # Check that multi-speaker lines are included
-    expect_match(parse_results$speaker,
-                 &quot; And &quot;,
-                 all = FALSE)
-    
-    # Check that certain edge phrases aren&#39;t considered speakers
-    expect_false(any(str_detect(parse_results$speaker,
-                                &quot;Signs&quot;)))
-    
-    expect_false(any(str_detect(parse_results$speaker,
-                                &quot;Yourself&quot;)))
-    
-    expect_false(any(str_detect(parse_results$speaker,
-                                &quot;Seven Sisters&quot;)))
+    # Test correct speaker parsing
+    test_that(&quot;Speaker has been parsed correctly&quot;, {
+      # Check that Mr. Mrs. and Dr. distinctions are correctly included
+      expect_match(parse_results$speaker,
+                   &quot;[MD][A-Za-z]{0,2}\\.&quot;,
+                   all = FALSE)
+      
+      # Check that fireman characters are included
+      expect_match(parse_results$speaker,
+                   &quot;Fireman&quot;,
+                   all = FALSE)
+      
+      # Check that multi-speaker lines are included
+      expect_match(parse_results$speaker,
+                   &quot; And &quot;,
+                   all = FALSE)
+      
+      # Check that certain edge phrases aren&#39;t considered speakers
+      expect_false(any(str_detect(parse_results$speaker,
+                                  &quot;Signs&quot;)))
+      
+      expect_false(any(str_detect(parse_results$speaker,
+                                  &quot;Yourself&quot;)))
+      
+      expect_false(any(str_detect(parse_results$speaker,
+                                  &quot;Seven Sisters&quot;)))
+    })
   })
 }</code></pre>
 <p>The following updated parsing function is the result of a feedback loop involving updating <code>parse_script</code>, running the test suite in <code>parse_tests</code>, and further adjusting <code>parse_script</code>.</p>
@@ -494,8 +495,10 @@ parse_tests &lt;- function(parse_fun){
                     &quot;The One Where Rachel Goes Back To Work&quot;,
                     &quot;The One With Ross&#39;s Inappropriate Song&quot;,
                     &quot;The One Where Dr. Remoray Dies&quot;,
+                    &quot;The One After the Superbowl&quot;,
                     &quot;The One Where Joey Moves Out&quot;,
                     &quot;The One Where Eddie Moves In&quot;,
+                    &quot;The One Where Eddie Won&#39;t Go&quot;,
                     &quot;The One Where Old Yeller Dies&quot;,
                     &quot;The One With The Two Parties&quot;,
                     &quot;The One With The Chicken Pox&quot;,
@@ -597,6 +600,41 @@ parse_tests &lt;- function(parse_fun){
 }
 
 parse_tests(parse_script)</code></pre>
+<pre><code>## ..........123456.78......
+## Failed --------------------------------------------------------------------
+## 1. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One Where Chandler Can&#39;t Remember Which Sister   Lines: 295
+## 
+## 2. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One Where Dr. Remoray Dies   Lines: 248
+## 
+## 3. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One Where Underdog Gets Away     Lines: 228
+## 
+## 4. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One With All The Jam     Lines: 234
+## 
+## 5. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One With Ross&#39;s Inappropriate Song   Lines: 224
+## 
+## 6. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One With The Cake    Lines: 267
+## 
+## 7. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One With The Mugging     Lines: 263
+## 
+## 8. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
+## n &lt;= 200 isn&#39;t true.
+## Episode: The One With The Sonogram At the End     Lines: 244
+## 
+## DONE ======================================================================</code></pre>
 <p>Once we have a parsing function that passes all our tests, we can run it over the full data again to generate an updated version of <code>friends_scripts</code>.</p>
 <pre class="r"><code>friends_scripts &lt;- friends_htmls %&gt;% 
   mutate(script = map2(html_data, episode_title, parse_script)) %&gt;% 
@@ -610,7 +648,7 @@ integrity_tbls[[2]] %&gt;%
   filter(pct_rnk &gt; .5) %&gt;% 
   unnest(episodes) %&gt;% 
   arrange(-nchar_speaker, count)</code></pre>
-<pre><code>## # A tibble: 48 x 5
+<pre><code>## # A tibble: 49 x 5
 ##                                                                      speaker
 ##                                                                        &lt;chr&gt;
 ##  1 I Was Living On The Street And I Needed Money For Food And Stuff I Monica
@@ -623,7 +661,7 @@ integrity_tbls[[2]] %&gt;%
 ##  8                                          Wow, Hey, Heres What We Gonna Do
 ##  9                                           Even More Humiliating Than Ross
 ## 10                                           You Didnt Happen To Tell Monica
-## # ... with 38 more rows, and 4 more variables: nchar_speaker &lt;int&gt;,
+## # ... with 39 more rows, and 4 more variables: nchar_speaker &lt;int&gt;,
 ## #   count &lt;int&gt;, pct_rnk &lt;dbl&gt;, episodes &lt;chr&gt;</code></pre>
 <p>The parsing still isn’t quite perfect. For example, <a href="http://www.livesinabox.com/friends/season9/907song.htm">The One With Ross’s Inappropriate Song</a> has an instance where speaker was parsed as <em>I Dont Know What To Say Ross</em>. Given the varied formatting of each episode, it’s difficult to write a parser that correctly distinguishes real speakers but doesn’t identify this value as a speaker. However, it appears that for the most part our parsing function has performed well.</p>
 </div>
@@ -702,11 +740,46 @@ multi_speaker_separator &lt;- function(speaker){
 friends_scripts %&lt;&gt;% 
   mutate(speaker = map(speaker, multi_speaker_separator)) %&gt;% 
   unnest(speaker)</code></pre>
+<p>The final step we’ll take for now is to standardize the main characters names. There are instances where instead of using the full name certain speakers are identified with shortened nicknames (ie Rach instead of Rachel).</p>
+<pre class="r"><code>friends_scripts %&lt;&gt;% 
+  mutate(speaker = case_when(speaker == &quot;Rach&quot; ~ &quot;Rachel&quot;,
+                             speaker == &quot;Phoe&quot; ~ &quot;Phoebe&quot;,
+                             speaker == &quot;Mnca&quot; ~ &quot;Monica&quot;,
+                             speaker == &quot;Chan&quot; ~ &quot;Chandler&quot;,
+                             TRUE ~ speaker))</code></pre>
+<p>Now that the most frequent speaker abbreviations have been adjusted, let’s validate the following assumption: the six main characters should show up in the top 10 speakers for each episode.</p>
+<pre class="r"><code>friends_scripts %&gt;% 
+  group_by(season_num,
+           episode_num) %&gt;% 
+  count(speaker) %&gt;% 
+  top_n(10, n) %&gt;% 
+  group_by(speaker) %&gt;% 
+  summarise(n = n()) %&gt;% 
+  arrange(-n) %&gt;% 
+  head(6)</code></pre>
+<pre><code>## # A tibble: 6 x 2
+##    speaker     n
+##      &lt;chr&gt; &lt;int&gt;
+## 1 Chandler   227
+## 2     Joey   227
+## 3   Monica   227
+## 4   Phoebe   227
+## 5   Rachel   227
+## 6     Ross   227</code></pre>
+<p>Based on this view, all main characters show up in the top ten characters for each episode. For now, our data cleaning work is done.</p>
 </div>
 <div id="celebrate" class="section level2">
 <h2>Celebrate</h2>
 <p>Whew. Pat yourself on the back. Take a breather. We made it! At this point, we’ll call our work complete for now. There are still some data cleaning tasks that can be performed (standardizing mispelled speaker names and dealing with nested lines) but we have a resonably clean data set that provides a foundation for future analyses. At some point I may revisit this to clean the data up a bit more, but for now we’ll accept what we have and move on.</p>
-<p>Our final <code>friends_scripts</code> is a tibble with 6 columns and 63122 rows containing the script from every Friends episode. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we’ve done here, let’s save <code>friends_scripts</code> so we can load it in the future.</p>
-<pre class="r"><code>saveRDS(friends_scripts,
+<p>Our final <code>friends_scripts</code> is a tibble with 6 columns and 63890 rows containing the script from every Friends episode. The next post will investigate this dataset by looking at the sentiment of Friends over time, both as a whole and by individual characters. To enable that future analysis without the need to rescrape and perform everything we’ve done here, let’s save <code>friends_scripts</code> so we can load it in the future.</p>
+<pre class="r"><code>friends_scripts %&lt;&gt;% select(season_num,
+                            episode_num,
+                            episode_title,
+                            speaker,
+                            line,
+                            line_num) %&gt;% 
+  ungroup()
+
+saveRDS(friends_scripts,
         file = &quot;../../data/friends/friends_scripts.Rds&quot;)</code></pre>
 </div>
