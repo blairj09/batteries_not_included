@@ -9,7 +9,7 @@ tags:
   - R
   - testthat
   - SoDS17
-images: ["/img/ad_hoc_testing.png"]
+images: ["/img/ad_hoc_testing.jpg"]
 ---
 ```{r setup, echo=FALSE, include=FALSE}
 # knitr options
