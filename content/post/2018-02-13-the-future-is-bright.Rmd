@@ -1,0 +1,37 @@
+---
+title: The FutuRe is Bright
+description: RStudio::conf 2018 recap
+author: James Blair
+date: '2018-02-13'
+slug: the-future-is-bright
+categories: []
+tags:
+  - R
+  - RStudio
+---
+
+What a rush. I’m still trying to fully process everything that happened at RStudio::conf. To be short, it was an incredible and transformative experience. Rather than just blast through everything that happened chronologically at the conference and everything I enjoyed (which would could go on forever, the list is long), I’ll instead highlight five general takeaways/themes from the conference. In a subsequent post I'll outline personal goals and takeaways that came from the conference as well. For those of you who just want the highlights, see the list below.
+
+### TL;DR:
+- RStudio is an organization dedicated to creating A+ tools that simplify data processes.
+- The R community is incredibly friendly, social, and approachable.
+- The folks involved with the [Tidyverse](https://www.tidyverse.org) (led by [Hadley Wickham](https://twitter.com/hadleywickham)) are purposeful and thoughtful about design and user experience.
+- R is used in a dizzying variety of industries.
+- Conference quality was off the hook. I was **never** bored and the 20 minute sessions were ruthlessly effective and efficient.
+
+## Conference Takeaways
+### RStudio continues to create A+ tools
+I was absolutely blown away by the staggering array of amazing tools and integrations I saw demonstrated at the conference. From training [TensorFlow](https://tensorflow.rstudio.com) models via Keras and watching live metrics come in through the IDE to stress testing shiny applications with 10,001 users, it’s very apparent that RStudio is well aware of customer needs and pain points and they are proactively working to address them. While this was technically a “vendor” conference, I never felt like that was the case. RStudio put together a meaningful and productive conference by avoiding hype and showcasing practical solutions to real problems. I already considered myself an RStudio megafan coming into the conference, but now I’ve gone to another level.
+![level 9000](/img/level_9000.gif)
+
+### The R community is friendly
+I’ve been a (usually) silent observer of the rstats community via twitter. Occasionally I’ll jump in and share thoughts or retweet something I found particularly helpful or inspiring, but for the most part I just sit back and observe. I’ve always admired the fact that, online, the R community seems helpful, kind, and aware of one another. This conference only further solidified that view. I made it a point during the conference to find and talk to individuals who are R rockstars in my eyes. In each case my interactions with these individuals showcased their breadth of knowledge along with their humble and approachable attitude. I was floored by the feeling of friendship that permeated the conference. My wife gave me a hard time for saying that "I found my people" at the conference, but it's true. The R community is welcoming to everyone, at least in my experience.
+
+### Intentional design
+The Tidyverse was, understandably, front and center for much of the conference. As I listened to Hadley Wickham and others detail the philosophy behind the Tidyverse I was impressed with the attention to detail that has been given to the creation of Tidyverse packages. I recall a question directed at [Max Kuhn](https://twitter.com/topepos) during the closing fireside chat in regards to modeling in the Tidyverse (a question he fielded frequently throughout the conference). His response helps illustrate what I’m referring to here. He mentioned that he’s comfortable with a “tidy” implementation of several algorithms, but he’s still working through how to create “tidy” version of the [Bradley Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) model. It’s this kind of attention to detail that makes the Tidyverse so functional and effective. The Tidyverse is intentional. Everything created within the scope of the Tidyverse is carefully considered and masterfully implemented.
+
+### R is not only for Data Scientists
+The conference provided attendees with lots of opportunities to mingle with one another. I have to say I was impressed with the level of socialization that occurred in a crowd I initially expected to be rather shy and reserved (likely just a projection of my own feelings). I loved the chance to meet individuals from all kinds of backgrounds, from education to agriculture to hockey to mining. I was impressed that I met very few people who introduced themselves “data scientists”. While that term is still loosely defined, many of these individuals were in attendance because their specific domain had a particular problem that R was well suited to address. It was eye opening to see how widely applicable R is and how hard RStudio works to make the R community welcoming to all backgrounds and skill levels.
+
+### Conference quality
+I was fortunate to attend the two training days prior to the conference along with the actual conference itself. I attended the training session titled *Applied Machine Learning* which was taught by Max Kuhn. Prior to the conference I was familiar with Max due to the [book](http://appliedpredictivemodeling.com/) he wrote with Kjell Johnson (which I now have a signed copy of). I wasn’t sure what to expect from Max as a presenter and I was pleasantly surprised. He was engaging, thoughtful, organized, and funny. For 7 hours a day, two days in a row I listened to Max teach about machine learning and various approaches within R and not once was I bored or tuned out. Not once! The rest of the conference was no different. Twenty minute session after twenty minute session flew by with a precision and effectiveness I can only imagine is matched in places like the military. Regardless of the session or content, every piece of this conference was meaningfully prepared and thoughtfully delivered. I would have expected a few duds here and there due simply to the sheer volume of content. Nope. Everything was of the utmost quality, even down to the snacks and meals. All around tremendous work by the RStudio staff and everyone who presented or participated in some way. I fully plan to be back next year.
