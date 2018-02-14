@@ -63,13 +63,13 @@ episode_urls %&lt;&gt;% str_subset(&quot;\\d{3,}&quot;)
 full_urls &lt;- glue::glue(&quot;http://www.livesinabox.com/friends/{episode_urls}&quot;)
 tibble(url = sample(full_urls, 5))</code></pre>
 <pre><code>## # A tibble: 5 x 1
-##                                                       url
-##                                                     &lt;chr&gt;
-## 1    http://www.livesinabox.com/friends/season9/0922.html
+##   url                                                    
+##   &lt;chr&gt;                                                  
+## 1 http://www.livesinabox.com/friends/season9/0922.html   
 ## 2 http://www.livesinabox.com/friends/season8/815towbv.htm
-## 3           http://www.livesinabox.com/friends/1006.shtml
-## 4   http://www.livesinabox.com/friends/season6/602rhr.htm
-## 5  http://www.livesinabox.com/friends/season2/207rofo.htm</code></pre>
+## 3 http://www.livesinabox.com/friends/1006.shtml          
+## 4 http://www.livesinabox.com/friends/season6/602rhr.htm  
+## 5 http://www.livesinabox.com/friends/season2/207rofo.htm</code></pre>
 <p>Notice that the url structure varies across seasons! However, all is not lost. The main landing page <a href="http://www.livesinabox.com/friends/scripts.shtml">here</a> contains links to each episode script. We can first scrape data from this page to get links to the script for every episode! In fact, we’ve already done that and we have the link to each episode stored in <code>episode_urls</code>. We also have the meta data associated with those links in <code>episode_nodes</code>.</p>
 <p><code>episode_nodes</code> is a xml_nodeset of length 228 containing the complete html for the link to each episode. This means we have access to the link title, which contains the episode title, season number, and episode number. We also have access to the link reference, which is a reference to the page with the html of the whole script (we’ve already extracted this as <code>episode_urls</code>). Now lets build out a function that will take the <code>xml_node</code> for each episode, extract the episode url and scrape the script associated with that url while also providing episode meta data (season number, episode number, and episode title).</p>
 <pre class="r"><code>scrape_script &lt;- function(xml_node){
@@ -341,30 +341,29 @@ data_integrity_outliers &lt;- function(friends_script_data){
 <pre class="r"><code>data_integrity_outliers(friends_scripts)</code></pre>
 <pre><code>## [[1]]
 ## # A tibble: 6 x 5
-##   season_num episode_num                                   episode_title
-##        &lt;dbl&gt;       &lt;dbl&gt;                                           &lt;chr&gt;
-## 1          9          15                        The One With The Mugging
-## 2          1          14                   The One With The Candy Hearts
-## 3          7          12              The One Where They&#39;re Up All Night
-## 4         10          17                                    The Last One
-## 5          9          23                             The One In Barbados
-## 6          4          23 The One With Ross&#39;s Wedding - The Uncut Version
-## # ... with 2 more variables: n &lt;int&gt;, pct_rnk &lt;dbl&gt;
+##   season_num episode_num episode_title                           n pct_rnk
+##        &lt;dbl&gt;       &lt;dbl&gt; &lt;chr&gt;                               &lt;int&gt;   &lt;dbl&gt;
+## 1         9.         15. The One With The Mugging               24 0.     
+## 2         1.         14. The One With The Candy Hearts         190 0.00441
+## 3         7.         12. The One Where They&#39;re Up All Night    198 0.00881
+## 4        10.         17. The Last One                          561 0.991  
+## 5         9.         23. The One In Barbados                   596 0.996  
+## 6         4.         23. The One With Ross&#39;s Wedding - The …   804 1.00   
 ## 
 ## [[2]]
 ## # A tibble: 60 x 5
-##    speaker nchar_speaker count    episodes     pct_rnk
-##      &lt;chr&gt;         &lt;int&gt; &lt;int&gt;      &lt;list&gt;       &lt;dbl&gt;
-##  1      PA             2     1   &lt;chr [1]&gt; 0.000000000
-##  2      TV             2     2   &lt;chr [1]&gt; 0.000000000
-##  3     All             3   304 &lt;chr [113]&gt; 0.002503129
-##  4     ALL             3    33   &lt;chr [9]&gt; 0.002503129
-##  5     Amy             3   119   &lt;chr [2]&gt; 0.002503129
-##  6     Ben             3    68   &lt;chr [9]&gt; 0.002503129
-##  7     BEN             3     5   &lt;chr [1]&gt; 0.002503129
-##  8     Bob             3    18   &lt;chr [3]&gt; 0.002503129
-##  9     Boy             3     1   &lt;chr [1]&gt; 0.002503129
-## 10     Cop             3    14   &lt;chr [1]&gt; 0.002503129
+##    speaker nchar_speaker count episodes    pct_rnk
+##    &lt;chr&gt;           &lt;int&gt; &lt;int&gt; &lt;list&gt;        &lt;dbl&gt;
+##  1 PA                  2     1 &lt;chr [1]&gt;   0.     
+##  2 TV                  2     2 &lt;chr [1]&gt;   0.     
+##  3 All                 3   304 &lt;chr [113]&gt; 0.00250
+##  4 ALL                 3    33 &lt;chr [9]&gt;   0.00250
+##  5 Amy                 3   119 &lt;chr [2]&gt;   0.00250
+##  6 Ben                 3    68 &lt;chr [9]&gt;   0.00250
+##  7 BEN                 3     5 &lt;chr [1]&gt;   0.00250
+##  8 Bob                 3    18 &lt;chr [3]&gt;   0.00250
+##  9 Boy                 3     1 &lt;chr [1]&gt;   0.00250
+## 10 Cop                 3    14 &lt;chr [1]&gt;   0.00250
 ## # ... with 50 more rows</code></pre>
 <p>Woah, <em>The One With The Mugging</em> currently contains only 24 lines. A quick visit to the <a href="http://www.livesinabox.com/friends/season9/915mug.htm">webpage</a> for that episode reveals that something on our end has gone terribly wrong. Let’s investigate and determine the problem. A good place to start is by stepping through the parsing function with the episode in question.</p>
 <pre class="r"><code># Pull out html for problem episode
@@ -601,41 +600,25 @@ parse_tests &lt;- function(parse_fun){
 }
 
 parse_tests(parse_script)</code></pre>
-<pre><code>## ..........123456.78......
-## Failed --------------------------------------------------------------------
-## 1. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One Where Chandler Can&#39;t Remember Which Sister   Lines: 295
+<pre><code>## ..........1......
+## ══ Failed ═══════════════════════════════════════════════════════════════════════
+## ── 1. Error: Number of lines per episode appears correct (@&lt;text&gt;#40)  ──────────
+## Evaluation error: n &lt;= 200 isn&#39;t true.
+## Episode: The One Where Chandler Can&#39;t Remember Which Sister   Lines: 295.
+## 1: line_counts %&gt;% mutate(test = map(n, ~expect_true(n &lt;= 200, info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;)))) at &lt;text&gt;:40
+## 2: withVisible(eval(quote(`_fseq`(`_lhs`)), env, env))
+## 3: eval(quote(`_fseq`(`_lhs`)), env, env)
+## 4: eval(quote(`_fseq`(`_lhs`)), env, env)
+## 5: `_fseq`(`_lhs`)
+## 6: freduce(value, `_function_list`)
+## 7: withVisible(function_list[[k]](value))
+## 8: function_list[[k]](value)
+## 9: mutate(., test = map(n, ~expect_true(n &lt;= 200, info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
+## 10: mutate.tbl_df(., test = map(n, ~expect_true(n &lt;= 200, info = glue::glue(&quot;Episode: {episode_title}\t Lines: {n}&quot;))))
+## 11: mutate_impl(.data, dots)
 ## 
-## 2. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One Where Dr. Remoray Dies   Lines: 248
-## 
-## 3. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One Where Underdog Gets Away     Lines: 228
-## 
-## 4. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One With All The Jam     Lines: 234
-## 
-## 5. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One With Ross&#39;s Inappropriate Song   Lines: 224
-## 
-## 6. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One With The Cake    Lines: 267
-## 
-## 7. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One With The Mugging     Lines: 263
-## 
-## 8. Failure: Number of lines per episode appears correct (@&lt;text&gt;#40) ------
-## n &lt;= 200 isn&#39;t true.
-## Episode: The One With The Sonogram At the End     Lines: 244
-## 
-## DONE ======================================================================</code></pre>
+## ══ DONE ═════════════════════════════════════════════════════════════════════════
+## No-one gets it right on their first try</code></pre>
 <p>Once we have a parsing function that passes all our tests, we can run it over the full data again to generate an updated version of <code>friends_scripts</code>.</p>
 <pre class="r"><code>friends_scripts &lt;- friends_htmls %&gt;% 
   mutate(script = map2(html_data, episode_title, parse_script)) %&gt;% 
@@ -650,20 +633,19 @@ integrity_tbls[[2]] %&gt;%
   unnest(episodes) %&gt;% 
   arrange(-nchar_speaker, count)</code></pre>
 <pre><code>## # A tibble: 49 x 5
-##                                                                      speaker
-##                                                                        &lt;chr&gt;
-##  1 I Was Living On The Street And I Needed Money For Food And Stuff I Monica
-##  2                                Everyone Almost Simultaneously Except Ross
-##  3                                  Youre Not Supposed To Say Long Pausejoey
-##  4                                      Monica, Chandler, Phoebe, And Rachel
-##  5                                        Chandler, Monica, Joey, And Rachel
-##  6                                         Now, I Really Have To Get Lennart
-##  7                                          Phoebe, Ross, Chandler, And Joey
-##  8                                          Wow, Hey, Heres What We Gonna Do
-##  9                                           Even More Humiliating Than Ross
-## 10                                           You Didnt Happen To Tell Monica
-## # ... with 39 more rows, and 4 more variables: nchar_speaker &lt;int&gt;,
-## #   count &lt;int&gt;, pct_rnk &lt;dbl&gt;, episodes &lt;chr&gt;</code></pre>
+##    speaker                      nchar_speaker count pct_rnk episodes      
+##    &lt;chr&gt;                                &lt;int&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;         
+##  1 I Was Living On The Street …            73     1   1.000 The One With …
+##  2 Everyone Almost Simultaneou…            42     1   0.999 The One With …
+##  3 Youre Not Supposed To Say L…            40     1   0.998 The One With …
+##  4 Monica, Chandler, Phoebe, A…            36     1   0.996 The One With …
+##  5 Chandler, Monica, Joey, And…            34     1   0.995 The One With …
+##  6 Now, I Really Have To Get L…            33     1   0.994 The One With …
+##  7 Phoebe, Ross, Chandler, And…            32     1   0.992 The Pilot-The…
+##  8 Wow, Hey, Heres What We Gon…            32     1   0.992 The One With …
+##  9 Even More Humiliating Than …            31     1   0.989 The One With …
+## 10 You Didnt Happen To Tell Mo…            31     1   0.989 The One With …
+## # ... with 39 more rows</code></pre>
 <p>The parsing still isn’t quite perfect. For example, <a href="http://www.livesinabox.com/friends/season9/907song.htm">The One With Ross’s Inappropriate Song</a> has an instance where speaker was parsed as <em>I Dont Know What To Say Ross</em>. Given the varied formatting of each episode, it’s difficult to write a parser that correctly distinguishes real speakers but doesn’t identify this value as a speaker. However, it appears that for the most part our parsing function has performed well.</p>
 </div>
 <div id="clean-scripts" class="section level2">
@@ -759,14 +741,14 @@ friends_scripts %&lt;&gt;%
   arrange(-n) %&gt;% 
   head(6)</code></pre>
 <pre><code>## # A tibble: 6 x 2
-##    speaker     n
-##      &lt;chr&gt; &lt;int&gt;
+##   speaker      n
+##   &lt;chr&gt;    &lt;int&gt;
 ## 1 Chandler   227
-## 2     Joey   227
-## 3   Monica   227
-## 4   Phoebe   227
-## 5   Rachel   227
-## 6     Ross   227</code></pre>
+## 2 Joey       227
+## 3 Monica     227
+## 4 Phoebe     227
+## 5 Rachel     227
+## 6 Ross       227</code></pre>
 <p>Based on this view, all main characters show up in the top ten characters for each episode. For now, our data cleaning work is done.</p>
 </div>
 <div id="celebrate" class="section level2">

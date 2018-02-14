@@ -9,7 +9,7 @@ tags:
   - R
   - testthat
   - SoDS17
-images: ["/img/ad_hoc_testing.png"]
+images: ["/img/seo/ad_hoc_testing.jpg"]
 ---
 
 
@@ -64,11 +64,9 @@ test_add(add_2)</code></pre>
 ## * add_fun(1, 1) not equal to 2.
 ## 1/1 mismatches
 ## [1] 1 - 2 == -1
-## 
 ## * add_fun(1, 2) not equal to 3.
 ## 1/1 mismatches
 ## [1] 2 - 3 == -1
-## 
 ## * add_fun(4, 5) not equal to 9.
 ## 1/1 mismatches
 ## [1] 20 - 9 == 11</code></pre>
@@ -90,28 +88,26 @@ test_add(add_1)
 test_add(add_2)
 print(&quot;Testing is done&quot;)</code></pre>
 <pre><code>## ....
-## DONE ======================================================================
+## ══ DONE ═════════════════════════════════════════════════════════════════════════
 ## .123
-## Failed --------------------------------------------------------------------
-## 1. Failure: Integers are correctly added (@&lt;text&gt;#5) ----------------------
+## ══ Failed ═══════════════════════════════════════════════════════════════════════
+## ── 1. Failure: Integers are correctly added (@&lt;text&gt;#5)  ────────────────────────
 ## add_fun(1, 1) not equal to 2.
 ## 1/1 mismatches
 ## [1] 1 - 2 == -1
 ## 
-## 
-## 2. Failure: Integers are correctly added (@&lt;text&gt;#6) ----------------------
+## ── 2. Failure: Integers are correctly added (@&lt;text&gt;#6)  ────────────────────────
 ## add_fun(1, 2) not equal to 3.
 ## 1/1 mismatches
 ## [1] 2 - 3 == -1
 ## 
-## 
-## 3. Failure: Integers are correctly added (@&lt;text&gt;#7) ----------------------
+## ── 3. Failure: Integers are correctly added (@&lt;text&gt;#7)  ────────────────────────
 ## add_fun(4, 5) not equal to 9.
 ## 1/1 mismatches
 ## [1] 20 - 9 == 11
 ## 
-## 
-## DONE ======================================================================
+## ══ DONE ═════════════════════════════════════════════════════════════════════════
+## No-one is perfect!
 ## [1] &quot;Testing is done&quot;</code></pre>
 <p>In this case even though there are code failures the chunk runs to completion. The clean output makes it possible to identify where failures occured and what specifically went wrong. However, one remaining problem is that there’s no way to differentiate in the test results what version of the function was being tested since the generic <code>add_fun()</code> from <code>test_add()</code> is all that’s reported. In this case it’s not a big deal because there are only two functions being tested and since we test them in succession it’s easy to identify which test results correspond with which function. However, if we were testing a larger collection of functions this would be a hastle. Luckily, using <code>context()</code> and some <code>rlang</code> magic, we can provide insight into which function is associated with each set of test results.</p>
 <pre class="r"><code>test_add &lt;- function(add_fun){
@@ -131,28 +127,25 @@ test_add(add_1)
 test_add(add_2)
 print(&quot;Testing is done&quot;)</code></pre>
 <pre><code>## add_1: ....
-## DONE ======================================================================
+## ══ DONE ═════════════════════════════════════════════════════════════════════════
 ## add_2: .123
-## Failed --------------------------------------------------------------------
-## 1. Failure: Integers are correctly added (@&lt;text&gt;#7) ----------------------
+## ══ Failed ═══════════════════════════════════════════════════════════════════════
+## ── 1. Failure: Integers are correctly added (@&lt;text&gt;#7)  ────────────────────────
 ## add_fun(1, 1) not equal to 2.
 ## 1/1 mismatches
 ## [1] 1 - 2 == -1
 ## 
-## 
-## 2. Failure: Integers are correctly added (@&lt;text&gt;#8) ----------------------
+## ── 2. Failure: Integers are correctly added (@&lt;text&gt;#8)  ────────────────────────
 ## add_fun(1, 2) not equal to 3.
 ## 1/1 mismatches
 ## [1] 2 - 3 == -1
 ## 
-## 
-## 3. Failure: Integers are correctly added (@&lt;text&gt;#9) ----------------------
+## ── 3. Failure: Integers are correctly added (@&lt;text&gt;#9)  ────────────────────────
 ## add_fun(4, 5) not equal to 9.
 ## 1/1 mismatches
 ## [1] 20 - 9 == 11
 ## 
-## 
-## DONE ======================================================================
+## ══ DONE ═════════════════════════════════════════════════════════════════════════
 ## [1] &quot;Testing is done&quot;</code></pre>
 <p>And just like that we have ad hoc informative testing that identifies tests that failed along with the function that was being tested at the time of failure.</p>
 </div>
@@ -172,8 +165,8 @@ with_reporter(SummaryReporter, {
   })
 })</code></pre>
 <pre><code>## 1
-## Failed --------------------------------------------------------------------
-## 1. Error: y less than 2 (@&lt;text&gt;#8) ---------------------------------------
+## ══ Failed ═══════════════════════════════════════════════════════════════════════
+## ── 1. Error: y less than 2 (@&lt;text&gt;#8)  ─────────────────────────────────────────
 ## could not find function &quot;mutate&quot;
 ## 1: test_data %&gt;% mutate(test = map2(y, x, function(y, x) {
 ##        expect_true(y &lt; 2, info = glue::glue(&quot;x = {x}; y = {y}&quot;))
@@ -186,7 +179,7 @@ with_reporter(SummaryReporter, {
 ## 7: withVisible(function_list[[k]](value))
 ## 8: function_list[[k]](value)
 ## 
-## DONE ======================================================================</code></pre>
+## ══ DONE ═════════════════════════════════════════════════════════════════════════</code></pre>
 <p>While this is once again a clearly contrived case, hoepfully it is clear to see how this type of convention could be useful in a more realistic setting - particularly when additional details about the failed test are required. In this particular example, we’re able to see the <code>x</code> and <code>y</code> value of each observation that failed the test. This makes it very simple to identify and address failing edge cases.</p>
 <p>To be clear, I’m not suggesting this workflow replace unit testing in any way. I’ve simply found this workflow useful when I’m evaluating the effectiveness of different functions on specific tasks with a high volume of edge cases (primarily parsing html).</p>
 </div>
