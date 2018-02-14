@@ -1,4 +1,4 @@
-baseURL = "https://batteriesnotincluded.rbind.io/"
+baseURL = "/"
 languageCode = "en-us"
 title = "Batteries Not Included"
 theme = "blackburn"
