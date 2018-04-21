@@ -12,7 +12,7 @@ tags:
   - Packages
 ---
 
-This details my motivation and efforts in creating [`dockerterm`](https://github.com/blairj09/dockerterm), an R package the provides an RStudio Addin for running a Docker container in the RStudio terminal.
+> This details my motivation and efforts in creating [`dockerterm`](https://github.com/blairj09/dockerterm), an R package the provides an RStudio Addin for running a Docker container in the RStudio terminal.
 
 Recently I've been using [Docker](https://www.docker.com) quite a bit with various projects I'm working on. I've always liked the idea of Docker, but as I've become more familiar with it I've started to really appreciate its magic. As a "way too brief" overview, Docker provides a convenient way to manage system dependencies by creating lightweight virtual environments known as containers. The use cases for these containers are limitless, but in the context of what I've been doing I've mainly been using Docker in connection with [R](https://www.r-project.org). This motivated me to explore what a connection between RStudio and Docker might look like. Essentially, I wanted a way to run R code from RStudio within a Docker container.
 
@@ -28,13 +28,13 @@ Once I could programatically manipulate the terminal pane, I needed a way to sta
 
 Now I just needed a way to allow the user to specify the image for the Docker container. To accomplish this, I created a simple [`shiny`](https://shiny.rstudio.com) application using [`miniUI`](https://github.com/rstudio/miniUI) (a shiny framework designed for RStudio Addin gadgets) that allows a user to select from an existing group of Docker images or to specify an image to download and run from [Docker Hub](https://hub.docker.com). Users can also specify which command is run within the container, with the default set to `R`.
 
-![](/post/2018-04-20-dockerterm_files/dockerterm_screenshot.png)
+![](/post/2018-04-20-dockerterm_files/dockerterm_screenshot.png){width=100%}
 
 Once the user makes their selections and clicks on Run, a new terminal is created and the docker container is attached to that window. If `R` was passed in as the command, the container starts an r session that the user can interact with as previously mentioned.
 
 ## PoC Performance
 
-![](/post/2018-04-20-dockerterm_files/gadget_demo.gif)
+![](/post/2018-04-20-dockerterm_files/gadget_demo.gif){width=100%}
 
 As seen in the clip above, this initial proof of concept works well, at least on my machine. There are some definite drawbacks and limitations that need to be addressed, but for the most part, I'm pleased with the initial functionality.
 

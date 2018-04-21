@@ -14,7 +14,9 @@ tags:
 
 
 
+<blockquote>
 <p>This details my motivation and efforts in creating <a href="https://github.com/blairj09/dockerterm"><code>dockerterm</code></a>, an R package the provides an RStudio Addin for running a Docker container in the RStudio terminal.</p>
+</blockquote>
 <p>Recently I’ve been using <a href="https://www.docker.com">Docker</a> quite a bit with various projects I’m working on. I’ve always liked the idea of Docker, but as I’ve become more familiar with it I’ve started to really appreciate its magic. As a “way too brief” overview, Docker provides a convenient way to manage system dependencies by creating lightweight virtual environments known as containers. The use cases for these containers are limitless, but in the context of what I’ve been doing I’ve mainly been using Docker in connection with <a href="https://www.r-project.org">R</a>. This motivated me to explore what a connection between RStudio and Docker might look like. Essentially, I wanted a way to run R code from RStudio within a Docker container.</p>
 <p>Now, before I get too far into this, it’s essential to note that RStudio Server plays very nicely with Docker and the combination of the two can provide the functionality I’m trying to achieve. In fact, the <a href="https://www.rocker-project.org">Rocker Project</a> maintains excellent Docker images with various R and RStudio product configurations. When using Docker with RStudio Server, the Docker container acts as the server supporting R and the port used by RStudio Server is mapped to a port on the host machine. After properly starting a Docker container with RStudio server (ie <code>docker run --rm -p 8787:8787 rocker/rstudio</code>) a user simply needs to visit <code>localhost:8787</code> in a browser on their machine to have access to RStudio and an r session running within the container. This is a workflow I use often. However, there are times when it would be nice to stay in my local version of RStudio and run code that I’m working on against a Docker container, which is how <code>dockerterm</code> was born.</p>
 <div id="framework" class="section level2">
@@ -26,12 +28,12 @@ tags:
 <p>Once I had a loose concept, I started exploring how to make a working proof of concept. First, I needed some way to manipulate the RStudio terminal pane. Enter the <a href="https://github.com/rstudio/rstudioapi"><code>rstudioapi</code></a> package, which provides useful functions for safely interacting with RStudio through R code. For this project, I found the functions pre-pended with <code>terminal</code> to be most helpful for manipulating the terminal pane and executing terminal commands.</p>
 <p>Once I could programatically manipulate the terminal pane, I needed a way to start up a Docker container running in the terminal. This can be simply accomplished using the Docker CLI and passing the appropriate options to <code>docker run</code>. I considered using the <a href="https://github.com/bhaskarvk/docker"><code>docker</code></a> R package, but hesitated to introduce a dependency on python. However, I may move in this direction in the future.</p>
 <p>Now I just needed a way to allow the user to specify the image for the Docker container. To accomplish this, I created a simple <a href="https://shiny.rstudio.com"><code>shiny</code></a> application using <a href="https://github.com/rstudio/miniUI"><code>miniUI</code></a> (a shiny framework designed for RStudio Addin gadgets) that allows a user to select from an existing group of Docker images or to specify an image to download and run from <a href="https://hub.docker.com">Docker Hub</a>. Users can also specify which command is run within the container, with the default set to <code>R</code>.</p>
-<p><img src="/post/2018-04-20-dockerterm_files/dockerterm_screenshot.png" /></p>
+<p><img src="/post/2018-04-20-dockerterm_files/dockerterm_screenshot.png" style="width:100.0%" /></p>
 <p>Once the user makes their selections and clicks on Run, a new terminal is created and the docker container is attached to that window. If <code>R</code> was passed in as the command, the container starts an r session that the user can interact with as previously mentioned.</p>
 </div>
 <div id="poc-performance" class="section level2">
 <h2>PoC Performance</h2>
-<p><img src="/post/2018-04-20-dockerterm_files/gadget_demo.gif" /></p>
+<p><img src="/post/2018-04-20-dockerterm_files/gadget_demo.gif" style="width:100.0%" /></p>
 <p>As seen in the clip above, this initial proof of concept works well, at least on my machine. There are some definite drawbacks and limitations that need to be addressed, but for the most part, I’m pleased with the initial functionality.</p>
 </div>
 <div id="limitations" class="section level2">
